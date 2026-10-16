@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Run the backend test suite (or part of it) in the test environment.
+#   ./backend/rspec
+#   ./backend/rspec spec/models/source_spec.rb:12
+set -euo pipefail
+cd "$(dirname "$0")/.."
+export HOST_UID="$(id -u)" HOST_GID="$(id -g)"
+
+docker compose exec -e RAILS_ENV=test backend bin/rspec "$@"

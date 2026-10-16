@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Run a command in the running backend container.
+#   ./backend/exec                      -> bash shell
+#   ./backend/exec bin/rails console
+#   ./backend/exec bin/rails g model Source name:string
+set -euo pipefail
+cd "$(dirname "$0")/.."
+export HOST_UID="$(id -u)" HOST_GID="$(id -g)"
+
+[ $# -eq 0 ] && set -- bash
+docker compose exec backend "$@"
