@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Run the frontend tests once (Vitest).
+#   ./frontend/test
+#   ./frontend/test src/App.test.tsx
+set -euo pipefail
+cd "$(dirname "$0")/.."
+export HOST_UID="$(id -u)" HOST_GID="$(id -g)"
+
+docker compose exec frontend npx vitest run "$@"

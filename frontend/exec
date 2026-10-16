@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Run a command in the running frontend container.
+#   ./frontend/exec                     -> bash shell
+#   ./frontend/exec npm install axios
+set -euo pipefail
+cd "$(dirname "$0")/.."
+export HOST_UID="$(id -u)" HOST_GID="$(id -g)"
+
+[ $# -eq 0 ] && set -- bash
+docker compose exec frontend "$@"
