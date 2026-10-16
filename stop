@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Stop and remove the dev containers. Data in storage/ and gems are kept.
+set -euo pipefail
+cd "$(dirname "$0")"
+export HOST_UID="$(id -u)" HOST_GID="$(id -g)"
+
+docker compose down "$@"

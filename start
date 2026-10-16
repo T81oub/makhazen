@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Start the dev stack (db, backend, frontend) in the background.
+set -euo pipefail
+cd "$(dirname "$0")"
+export HOST_UID="$(id -u)" HOST_GID="$(id -g)"
+
+docker compose up -d --build "$@"
+docker compose ps
+
+docker compose logs -f
