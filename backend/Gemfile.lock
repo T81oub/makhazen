@@ -303,6 +303,8 @@ GEM
       ffi (~> 1.12)
       logger
     securerandom (0.4.1)
+    sequel (5.109.0)
+      bigdecimal
     solid_cable (4.1.0)
       actioncable (>= 7.2)
       activejob (>= 7.2)
@@ -367,6 +369,7 @@ DEPENDENCIES
   rails (~> 8.1.4)
   rspec-rails (~> 8.0)
   rubocop-rails-omakase
+  sequel (~> 5.109)
   solid_cable
   solid_cache
   solid_queue
