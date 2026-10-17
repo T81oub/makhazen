@@ -7,13 +7,13 @@ export HOST_UID="$(id -u)" HOST_GID="$(id -g)"
 files=(-f docker-compose.yml)
 args=()
 for arg in "$@"; do
-    extra="docker-compose.${arg#--}.yml"
+  extra="docker-compose.${arg#--}.yml"
 
-    if [[ "$arg" == --* && -f "$extra" ]]; then
-        files+=(-f "$extra")
-    else
-        args+=("$arg")
-    fi
+  if [[ "$arg" == --* && -f "$extra" ]]; then
+    files+=(-f "$extra")
+  else
+    args+=("$arg")
+  fi
 done
 
 docker compose "${files[@]}" up -d --build "${args[@]}"
