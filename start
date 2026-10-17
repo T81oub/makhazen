@@ -4,7 +4,18 @@ set -euo pipefail
 cd "$(dirname "$0")"
 export HOST_UID="$(id -u)" HOST_GID="$(id -g)"
 
-docker compose up -d --build "$@"
-docker compose ps
+files=(-f docker-compose.yml)
+args=()
+for arg in "$@"; do
+    extra="docker-compose.${arg#--}.yml"
+    
+    if [[ "$arg" == --* && -f "$extra" ]]; then
+        files+=(-f "$extra")
+    else
+        args+=("$arg")
+    fi
+done
 
-docker compose logs -f
+docker compose "${files[@]}" up -d --build "${args[@]}"
+docker compose "${files[@]}" ps
+docker compose "${files[@]}" logs -f
