@@ -8,7 +8,7 @@ files=(-f docker-compose.yml)
 args=()
 for arg in "$@"; do
     extra="docker-compose.${arg#--}.yml"
-    
+
     if [[ "$arg" == --* && -f "$extra" ]]; then
         files+=(-f "$extra")
     else
