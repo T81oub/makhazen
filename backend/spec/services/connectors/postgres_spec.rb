@@ -49,4 +49,35 @@ RSpec.describe Connectors::Postgres, :integration do
         }
     end
   end
+
+  describe "#discover" do
+    context "with the default config" do
+      let(:streams) { connector.discover }
+      let(:names) { streams.map { |s| s[:name] } }
+
+      it "lists every table you can sync, in order" do
+        expect(names).to eq([ 'actor', 'address', 'category', 'city', 'country', 'customer', 'film', 'film_actor', 'film_category', 'inventory', 'language', 'payment', 'rental', 'staff', 'store' ])
+      end
+
+      it "skips views" do
+        expect(names).not_to include("actor_info", "customer_list")
+      end
+
+      it "keeps payment as a partitioned parent table" do
+        expect(streams).to include(include(name: "payment", relkind: "p"))
+      end
+    end
+
+    context "when the connection fails" do
+      it "raises a ConnectionError" do
+        expect { connector(password: "wrong").discover }
+          .to raise_error(Connectors::ConnectionError)
+      end
+    end
+
+    it "closes its connection" do
+      connector.discover
+      expect(Sequel::DATABASES).to be_empty
+    end
+  end
 end
