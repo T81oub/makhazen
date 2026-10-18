@@ -12,6 +12,8 @@ class Source < ApplicationRecord
   validates :config, presence: true
   validate  :source_config_validate?
 
+  has_many :streams, dependent: :destroy
+
   def source_config_validate?
     [ "host", "port", "database", "username", "password" ].each do |attr|
       return if config.blank?
