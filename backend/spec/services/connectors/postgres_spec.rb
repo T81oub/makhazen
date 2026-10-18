@@ -79,5 +79,20 @@ RSpec.describe Connectors::Postgres, :integration do
       connector.discover
       expect(Sequel::DATABASES).to be_empty
     end
+
+    it "describes film_actor with its columns and composite primary key" do
+      stream_schema = {
+        schema: "public",
+        name: "film_actor",
+        relkind: "r",
+        columns: [
+          { name: "actor_id", nullable: false, type: "integer" },
+          { name: "film_id", nullable: false, type: "integer" },
+          { name: "last_update", nullable: false, type: "timestamp with time zone" }
+        ],
+        primary_key: [ "actor_id", "film_id" ]
+      }
+      expect(connector.discover).to include(stream_schema)
+    end
   end
 end
