@@ -88,4 +88,16 @@ RSpec.describe Source, type: :model do
       expect(build_source.inspect).not_to include("s3cret-password")
     end
   end
+
+  describe "#connector_instance" do
+    it "had a valid connector" do
+      source = build_source
+      expect(source.connector_instance).to be_a(Connectors::Postgres)
+    end
+
+    it "not a valid connector" do
+      source = build_source(connector: "my_connector")
+      expect { source.connector_instance }.to raise_error(KeyError, /my_connector/)
+    end
+  end
 end

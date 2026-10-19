@@ -14,6 +14,8 @@ class Source < ApplicationRecord
 
   has_many :streams, dependent: :destroy
 
+  CONNECTOR_CLASSES = { "postgres" => Connectors::Postgres }.freeze
+
   def source_config_validate?
     [ "host", "port", "database", "username", "password" ].each do |attr|
       return if config.blank?
@@ -22,5 +24,9 @@ class Source < ApplicationRecord
         errors.add(:config, "is missing #{attr}")
       end
     end
+  end
+
+  def connector_instance
+    CONNECTOR_CLASSES.fetch(connector).new(config)
   end
 end
