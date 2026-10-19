@@ -136,5 +136,23 @@ RSpec.describe Source, type: :model do
       source.discover!
       expect(source.streams.count).to eq(1)
     end
+
+    it "marks a stream as removed when its table disappears" do
+      source.discover!
+      allow(source).to receive(:connector_instance)
+        .and_return(double(discover: [ discovered.first.merge(name: "actor") ]))
+      source.discover!
+
+      expect(source.streams.find_by(name: "rental")).to be_removed
+      expect(source.streams.find_by(name: "actor")).not_to be_removed
+    end
+
+    it "clears removed_at when the table comes back" do
+      source.discover!
+      source.streams.update_all(removed_at: Time.current)
+      source.discover!
+
+      expect(source.streams.find_by(name: "rental")).not_to be_removed
+    end
   end
 end

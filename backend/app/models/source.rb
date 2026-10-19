@@ -27,11 +27,14 @@ class Source < ApplicationRecord
   end
 
   def discover!
-    connector_instance.discover.each do |table|
+    found_ids = connector_instance.discover.map do |table|
       stream = streams.find_or_initialize_by(schema_name: table[:schema], name: table[:name])
       stream.destination_table ||= Stream.destination_table_for(name, table[:schema], table[:name])
-      stream.update!(source_columns: table[:columns], source_primary_key: table[:primary_key])
+      stream.update!(source_columns: table[:columns], source_primary_key: table[:primary_key], removed_at: nil)
+      stream.id
     end
+
+    streams.active.where.not(id: found_ids).update_all(removed_at: Time.current)
   end
 
   def connector_instance
