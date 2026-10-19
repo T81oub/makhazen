@@ -12,4 +12,8 @@ class Stream < ApplicationRecord
   def removed?
     removed_at.present?
   end
+
+  def self.destination_table_for(source_name, schema_name, table_name)
+    ([ source_name, schema_name, table_name ] - [ "public" ]).join("__")
+  end
 end

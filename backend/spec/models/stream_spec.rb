@@ -150,4 +150,14 @@ RSpec.describe Stream, type: :model do
       expect(Stream.to_sync).to contain_exactly(selected_stream)
     end
   end
+
+  describe ".destination_table_for" do
+    it "leaves out the public schema" do
+      expect(Stream.destination_table_for("pagila", "public", "film_actor")).to eq("pagila__film_actor")
+    end
+
+    it "keeps any other schema" do
+      expect(Stream.destination_table_for("pagila", "sales", "orders")).to eq("pagila__sales__orders")
+    end
+  end
 end
