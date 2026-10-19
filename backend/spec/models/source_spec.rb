@@ -100,4 +100,41 @@ RSpec.describe Source, type: :model do
       expect { source.connector_instance }.to raise_error(KeyError, /my_connector/)
     end
   end
+
+  describe "#discover!" do
+    let(:source) { build_source.tap(&:save!) }
+    let(:discovered) do
+      [
+        {
+          schema: "public",
+          name: "rental",
+          relkind: "r",
+          columns: [
+            {
+              name: "rental_id",
+              type: "integer",
+              nullable: false
+            }
+          ],
+          primary_key: [ "rental_id" ]
+        }
+      ]
+    end
+
+    before do
+      fake_connector = double("connector", discover: discovered)
+      allow(source).to receive(:connector_instance).and_return(fake_connector)
+    end
+
+    it "creates a stream for each discovered table" do
+      source.discover!
+      expect(source.streams.pluck(:name)).to eq([ "rental" ])
+    end
+
+    it "does not create duplicates when run twice" do
+      source.discover!
+      source.discover!
+      expect(source.streams.count).to eq(1)
+    end
+  end
 end

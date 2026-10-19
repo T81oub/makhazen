@@ -26,6 +26,14 @@ class Source < ApplicationRecord
     end
   end
 
+  def discover!
+    connector_instance.discover.each do |table|
+      stream = streams.find_or_initialize_by(schema_name: table[:schema], name: table[:name])
+      stream.destination_table ||= Stream.destination_table_for(name, table[:schema], table[:name])
+      stream.update!(source_columns: table[:columns], source_primary_key: table[:primary_key])
+    end
+  end
+
   def connector_instance
     CONNECTOR_CLASSES.fetch(connector).new(config)
   end
