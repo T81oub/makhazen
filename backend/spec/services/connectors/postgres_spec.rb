@@ -95,4 +95,27 @@ RSpec.describe Connectors::Postgres, :integration do
       expect(connector.discover).to include(stream_schema)
     end
   end
+    describe "#read" do
+    def read_all(table)
+      stream = Stream.new(schema_name: "public", name: table)
+      batches = []
+      connector.read(stream) { |batch| batches << batch }
+      batches
+    end
+
+    it "reads every row of the table" do
+      expect(read_all("actor").flatten.size).to eq(200)
+    end
+
+    it "reads a big table in batches of at most 1000 rows" do
+      batches = read_all("rental")
+      expect(batches.size).to eq(17)
+      expect(batches.map(&:size).max).to eq(1000)
+    end
+
+    it "gives each row as a Hash" do
+      penelope = read_all("actor").flatten.find { |row| row[:actor_id] == 1 }
+      expect(penelope).to include(first_name: "PENELOPE", last_name: "GUINESS")
+    end
+  end
 end

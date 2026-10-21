@@ -34,6 +34,14 @@ module Connectors
       end
     end
 
+    def read(stream)
+      with_connection do |db|
+        db[Sequel[stream.schema_name.to_sym][stream.name.to_sym]].paged_each(rows_per_fetch: 1000).each_slice(1000) do |batch|
+          yield batch
+        end
+      end
+    end
+
     private
 
     def with_connection
