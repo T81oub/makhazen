@@ -1,5 +1,6 @@
 class Stream < ApplicationRecord
   belongs_to :source
+  has_many :syncs, dependent: :destroy
 
   validates :schema_name, presence: true
   validates :name, presence: true, uniqueness: { scope: [ :source_id, :schema_name ] }

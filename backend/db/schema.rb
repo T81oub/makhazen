@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_18_213428) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_21_212626) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -38,5 +38,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_18_213428) do
     t.index ["source_id"], name: "index_streams_on_source_id"
   end
 
+  create_table "syncs", force: :cascade do |t|
+    t.bigint "stream_id", null: false
+    t.string "status", default: "running", null: false
+    t.datetime "started_at"
+    t.datetime "finished_at"
+    t.integer "rows_loaded", default: 0, null: false
+    t.text "error"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["stream_id"], name: "index_syncs_on_stream_id"
+  end
+
   add_foreign_key "streams", "sources"
+  add_foreign_key "syncs", "streams"
 end
