@@ -14,6 +14,27 @@ class Stream < ApplicationRecord
     removed_at.present?
   end
 
+  def sync!
+    sync = syncs.create!(started_at: Time.current)
+
+    #TODO: shouldn't drop all the table while sync
+    Warehouse::Raw.db.drop_table?(Warehouse::Raw.table(self))
+    Warehouse::Raw.create_table(self)
+
+    count = 0
+
+    source.connector_instance.read(self) do |batch|
+      Warehouse::Raw.load(self, batch)
+      count += batch.size
+    end
+
+    sync.update!(status: "succeeded", rows_loaded: count, finished_at: Time.current)
+    sync
+  rescue => e
+    sync&.update!(status: "failed", error: e.message, finished_at: Time.current)
+    raise
+  end
+
   def self.destination_table_for(source_name, schema_name, table_name)
     ([ source_name, schema_name, table_name ] - [ "public" ]).join("__")
   end

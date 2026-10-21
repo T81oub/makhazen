@@ -76,8 +76,7 @@ RSpec.describe Connectors::Postgres, :integration do
     end
 
     it "closes its connection" do
-      connector.discover
-      expect(Sequel::DATABASES).to be_empty
+      expect { connector.discover }.not_to change { Sequel::DATABASES.size }
     end
 
     it "describes film_actor with its columns and composite primary key" do

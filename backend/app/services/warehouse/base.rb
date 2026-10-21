@@ -2,7 +2,11 @@ module Warehouse
   class Base
 
     def self.db
-      @db ||= Sequel.connect(
+      Base.connection
+    end
+
+    def self.connection
+      @connection ||= Sequel.connect(
         adapter: "postgres",
         host: ENV.fetch("PGHOST"),
         user: ENV.fetch("PGUSER"),
