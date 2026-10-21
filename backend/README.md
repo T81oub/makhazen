@@ -1,24 +1,39 @@
 # README
 
-This README would normally document whatever steps are necessary to get the
-application up and running.
 
-Things you may want to cover:
+  SOURCES                      MAKHAZEN                                  WAREHOUSE
+  (Extern)                  (Rails app)                               (Postgres)
 
-* Ruby version
+  Postgres  ─┐            ┌─ Source   "where + how to connect"
+  MySQL     ─┤ connector ─┤  Stream   "which table/file, selected?"   ┌─► raw      exact copies
+  data.gouv ─┤  check     │  Sync     "what happened each run"        │   staging  cleaned (SQL)
+  REST API  ─┘  discover  └─ Job ──── read ──── COPY ─────────────────┘   marts    business tables
+                read                                                             │
+                                                                      API + API keys ──► users
 
-* System dependencies
 
-* Configuration
+## try it for real
 
-* Database creation
+```bash
+./start --pagila
+./backend/exec bin/rails c
+```
 
-* Database initialization
+```ruby
 
-* How to run the test suite
+pagila = Source.find_or_create_by!(name: "pagila") do |source|
+  source.connector = "postgres"
+  source.config = { "host" => "source_db", "port" => 5432, "database" => "pagila",
+                    "username" => "makhazen_reader", "password" => "reader" }
+end
 
-* Services (job queues, cache servers, search engines, etc.)
+p pagila.connector_instance.check          # => true
+ pagila.discover!
+p pagila.streams.count                     # => 15
 
-* Deployment instructions
+rental = pagila.streams.find_by(name: "rental")
+sync = rental.sync!
+p sync.status                              # => "succeeded"
+p sync.rows_loaded                         # => 16044
 
-* ...
+```
