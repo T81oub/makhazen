@@ -93,6 +93,12 @@ RSpec.describe Connectors::Postgres, :integration do
       }
       expect(connector.discover).to include(stream_schema)
     end
+
+    it "turns enum columns into text, which the warehouse understands" do
+      film = connector.discover.find { |s| s[:name] == "film" }
+      rating = film[:columns].find { |c| c[:name] == "rating" }
+      expect(rating[:type]).to eq("text")
+    end
   end
     describe "#read" do
     def read_all(table)

@@ -25,7 +25,9 @@ module Connectors
           columns_info = db.schema(Sequel.qualify(*table.values_at(:schema, :name)))
 
           columns = columns_info.map do |name, info|
-            { name: name.to_s, type: info[:db_type], nullable: info[:allow_null] }
+            # Enums are custom types that only exist in the source, so store them as text.
+            type = info[:type] == :enum ? "text" : info[:db_type]
+            { name: name.to_s, type: type, nullable: info[:allow_null] }
           end
           primary_key = columns_info.filter_map { |name, info| name.to_s if info[:primary_key] }
 
