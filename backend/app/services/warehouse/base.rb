@@ -1,6 +1,5 @@
 module Warehouse
   class Base
-
     def self.db
       Base.connection
     end

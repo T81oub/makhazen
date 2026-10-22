@@ -17,7 +17,7 @@ class Stream < ApplicationRecord
   def sync!
     sync = syncs.create!(started_at: Time.current)
 
-    #TODO: shouldn't drop all the table while sync
+    # TODO: shouldn't drop all the table while sync
     Warehouse::Raw.db.drop_table?(Warehouse::Raw.table(self))
     Warehouse::Raw.create_table(self)
 
