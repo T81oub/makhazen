@@ -37,6 +37,15 @@ class Source < ApplicationRecord
     streams.active.where.not(id: found_ids).update_all(removed_at: Time.current)
   end
 
+  def sync!
+    streams.to_sync.map do |stream|
+      stream.sync!
+    rescue StandardError
+      stream.syncs.last
+    end
+  end
+
+
   def connector_instance
     CONNECTOR_CLASSES.fetch(connector).new(config)
   end
