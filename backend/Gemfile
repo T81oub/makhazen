@@ -52,3 +52,9 @@ end
 gem "rspec-rails", "~> 8.0", groups: [ :development, :test ]
 
 gem "sequel", "~> 5.109"
+
+gem "faraday", "~> 2.15"
+gem "faraday-retry", "~> 2.4"
+gem "rubyzip", "~> 3.7"
+
+gem "duckdb", "~> 1.5.6"

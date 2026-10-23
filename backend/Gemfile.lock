@@ -97,11 +97,21 @@ GEM
     diff-lcs (1.6.2)
     dotenv (3.2.0)
     drb (2.2.3)
+    duckdb (1.5.6.1)
+      bigdecimal (>= 3.1.4)
     ed25519 (1.4.0)
     erb (6.0.7)
     erubi (1.13.1)
     et-orbi (1.4.2)
       tzinfo
+    faraday (2.15.0)
+      faraday-net_http (>= 2.0, < 3.6)
+      json
+      logger
+    faraday-net_http (3.5.0)
+      net-http (~> 0.5)
+    faraday-retry (2.4.0)
+      faraday (~> 2.0)
     ffi (1.17.4-aarch64-linux-gnu)
     ffi (1.17.4-aarch64-linux-musl)
     ffi (1.17.4-arm-linux-gnu)
@@ -156,6 +166,9 @@ GEM
       drb (~> 2.0)
       prism (~> 1.5)
     msgpack (1.8.5)
+    net-http (0.10.0)
+      net-protocol (>= 0.3.0)
+      uri (>= 0.11.1)
     net-imap (0.6.8)
       date
       net-protocol
@@ -302,6 +315,7 @@ GEM
     ruby-vips (2.3.0)
       ffi (~> 1.12)
       logger
+    rubyzip (3.7.0)
     securerandom (0.4.1)
     sequel (5.109.0)
       bigdecimal
@@ -362,6 +376,9 @@ DEPENDENCIES
   brakeman
   bundler-audit
   debug
+  duckdb (~> 1.5.6)
+  faraday (~> 2.15)
+  faraday-retry (~> 2.4)
   image_processing (~> 1.2)
   kamal
   pg (~> 1.1)
@@ -369,6 +386,7 @@ DEPENDENCIES
   rails (~> 8.1.4)
   rspec-rails (~> 8.0)
   rubocop-rails-omakase
+  rubyzip (~> 3.7)
   sequel (~> 5.109)
   solid_cable
   solid_cache
