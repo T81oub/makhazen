@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Runs RuboCop on the Ruby files you're about to commit.
+set -euo pipefail
+
+files=$(git diff --cached --name-only --diff-filter=ACM -- 'backend/*.rb' | sed 's|^backend/||')
+[ -z "$files" ] && exit 0
+
+docker compose exec -T backend bin/rubocop --force-exclusion $files || {
+  echo
+  echo "RuboCop found problems. Fix them with: ./backend/exec bin/rubocop -a"
+  exit 1
+}
