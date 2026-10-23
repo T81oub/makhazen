@@ -17,9 +17,10 @@ class Source < ApplicationRecord
   CONNECTOR_CLASSES = { "postgres" => Connectors::Postgres }.freeze
 
   def source_config_validate?
-    [ "host", "port", "database", "username", "password" ].each do |attr|
-      return if config.blank?
+    return unless CONNECTOR_CLASSES.key?(connector)
+    return if config.blank?
 
+    CONNECTOR_CLASSES.fetch(connector)::REQUIRED_CONFIG.each do |attr|
       if config[attr].blank?
         errors.add(:config, "is missing #{attr}")
       end

@@ -1,5 +1,7 @@
 module Connectors
   class Postgres < Base
+    REQUIRED_CONFIG = [ "host", "port", "database", "username", "password" ].freeze
+
     def check
       with_connection { |db| db.test_connection }
 
