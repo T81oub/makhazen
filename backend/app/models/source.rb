@@ -7,7 +7,7 @@ class Source < ApplicationRecord
   validates  :name, format: { with: /\A[a-z][a-z0-9_]*\z/ }
 
   validates :connector, presence: true
-  enum :connector, { postgres: "postgres", data_gouv: "data_gouv" }, validate: true
+  enum :connector, { postgres: "postgres", data_gouv: "data_gouv", http: "http" }, validate: true
 
   validates :config, presence: true
   validate  :source_config_validate?
@@ -16,7 +16,8 @@ class Source < ApplicationRecord
 
   CONNECTOR_CLASSES = {
     "postgres"  => Connectors::Postgres,
-    "data_gouv" => Connectors::DataGouv
+    "data_gouv" => Connectors::DataGouv,
+    "http"      => Connectors::Http
   }.freeze
 
   def source_config_validate?

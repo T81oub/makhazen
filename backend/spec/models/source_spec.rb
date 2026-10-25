@@ -54,8 +54,19 @@ RSpec.describe Source, type: :model do
       expect(source.errors[:connector]).to include("is not included in the list")
     end
 
+    it "accepts http" do
+      expect(build_source(connector: "http", config: { "urls" => [ "https://example.com/a.csv" ] })).to be_valid
+    end
+
     it "accepts data_gouv" do
       expect(build_source(connector: "data_gouv", config: { "dataset" => "waste-2022" })).to be_valid
+    end
+
+    it "needs urls for http" do
+      source = build_source(connector: "http", config: { "auth" => { "type" => "bearer", "token" => "t" } })
+
+      expect(source).not_to be_valid
+      expect(source.errors[:config]).to include("is missing urls")
     end
 
     it "needs a dataset for data_gouv" do
