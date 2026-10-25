@@ -7,14 +7,17 @@ class Source < ApplicationRecord
   validates  :name, format: { with: /\A[a-z][a-z0-9_]*\z/ }
 
   validates :connector, presence: true
-  enum :connector, { postgres: "postgres" }, validate: true
+  enum :connector, { postgres: "postgres", data_gouv: "data_gouv" }, validate: true
 
   validates :config, presence: true
   validate  :source_config_validate?
 
   has_many :streams, dependent: :destroy
 
-  CONNECTOR_CLASSES = { "postgres" => Connectors::Postgres }.freeze
+  CONNECTOR_CLASSES = {
+    "postgres"  => Connectors::Postgres,
+    "data_gouv" => Connectors::DataGouv
+  }.freeze
 
   def source_config_validate?
     return unless CONNECTOR_CLASSES.key?(connector)
@@ -30,7 +33,13 @@ class Source < ApplicationRecord
   def discover!
     found_ids = connector_instance.discover.map do |table|
       stream = streams.find_or_initialize_by(schema_name: table[:schema], name: table[:name])
-      stream.destination_table ||= Stream.destination_table_for(name, table[:schema], table[:name])
+
+      if table[:destination]
+        stream.destination_table ||= "#{name}__#{table[:destination]}"
+      else
+        stream.destination_table ||= Stream.destination_table_for(name, table[:schema], table[:name])
+      end
+
       stream.update!(source_columns: table[:columns], source_primary_key: table[:primary_key], removed_at: nil)
       stream.id
     end

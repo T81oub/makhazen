@@ -53,6 +53,22 @@ RSpec.describe Source, type: :model do
       expect(source).not_to be_valid
       expect(source.errors[:connector]).to include("is not included in the list")
     end
+
+    it "accepts data_gouv" do
+      expect(build_source(connector: "data_gouv", config: { "dataset" => "waste-2022" })).to be_valid
+    end
+
+    it "needs a dataset for data_gouv" do
+      source = build_source(connector: "data_gouv", config: { "other" => "x" })
+
+      expect(source).not_to be_valid
+      expect(source.errors[:config]).to include("is missing dataset")
+    end
+
+    it "builds a DataGouv connector" do
+      source = build_source(connector: "data_gouv", config: { "dataset" => "waste-2022" })
+      expect(source.connector_instance).to be_a(Connectors::DataGouv)
+    end
   end
 
   describe "config" do
@@ -153,6 +169,19 @@ RSpec.describe Source, type: :model do
       source.discover!
 
       expect(source.streams.find_by(name: "rental")).not_to be_removed
+    end
+
+    it "names the table after the source and the stream" do
+      source.discover!
+      expect(source.streams.first.destination_table).to eq("pagila__rental")
+    end
+
+    it "uses the destination the connector gives" do
+      allow(source).to receive(:connector_instance)
+        .and_return(double(discover: [ discovered.first.merge(schema: "res-zip", name: "ds_data", destination: "ds_data") ]))
+      source.discover!
+
+      expect(source.streams.first.destination_table).to eq("pagila__ds_data")
     end
   end
 end
