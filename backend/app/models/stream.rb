@@ -4,7 +4,7 @@ class Stream < ApplicationRecord
 
   validates :schema_name, presence: true
   validates :name, presence: true, uniqueness: { scope: [ :source_id, :schema_name ] }
-  validates :destination_table, presence: true, length: { maximum: 63 },
+  validates :destination_table, presence: true, uniqueness: true, length: { maximum: 63 },
                                 format: { with: /\A[a-z][a-z0-9_]*\z/ }
 
   scope :active, -> { where(removed_at: nil) }
@@ -37,5 +37,12 @@ class Stream < ApplicationRecord
 
   def self.destination_table_for(source_name, schema_name, table_name)
     ([ source_name, schema_name, table_name ] - [ "public" ]).join("__")
+  end
+
+  def self.available_destination_table(base)
+    candidate = base
+    suffix = 1
+    candidate = "#{base}_#{suffix += 1}" while exists?(destination_table: candidate)
+    candidate
   end
 end

@@ -85,9 +85,31 @@ RSpec.describe Stream, type: :model do
     end
   end
 
+  describe ".available_destination_table" do
+    it "returns the name when it is free" do
+      expect(Stream.available_destination_table("pagila__film_actor")).to eq("pagila__film_actor")
+    end
+
+    it "adds the next free suffix when the name is taken" do
+      build_stream.save!
+      build_stream(name: "film_actor_2", destination_table: "pagila__film_actor_2").save!
+
+      expect(Stream.available_destination_table("pagila__film_actor")).to eq("pagila__film_actor_3")
+    end
+  end
+
   describe "destination_table" do
     it "is required" do
       expect(build_stream(destination_table: nil)).not_to be_valid
+    end
+
+    it "is unique across all sources" do
+      build_stream.save!
+      other_source = Source.create!(name: "pagila_copy", connector: "postgres", config: source.config)
+      other = other_source.streams.build(schema_name: "public", name: "film_actor", destination_table: "pagila__film_actor")
+
+      expect(other).not_to be_valid
+      expect(other.errors[:destination_table]).to include("has already been taken")
     end
 
     it "is at most 63 characters, the Postgres limit for names" do

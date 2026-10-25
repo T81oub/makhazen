@@ -194,5 +194,28 @@ RSpec.describe Source, type: :model do
 
       expect(source.streams.first.destination_table).to eq("pagila__ds_data")
     end
+
+    it "adds a suffix when two files have the same name" do
+      same_name = [
+        discovered.first.merge(schema: "https://a.com/data.csv", name: "data", destination: "data"),
+        discovered.first.merge(schema: "https://b.com/data.csv", name: "data", destination: "data")
+      ]
+      allow(source).to receive(:connector_instance).and_return(double(discover: same_name))
+      source.discover!
+
+      expect(source.streams.pluck(:destination_table)).to contain_exactly("pagila__data", "pagila__data_2")
+    end
+
+    it "keeps the same names when run again" do
+      same_name = [
+        discovered.first.merge(schema: "https://a.com/data.csv", name: "data", destination: "data"),
+        discovered.first.merge(schema: "https://b.com/data.csv", name: "data", destination: "data")
+      ]
+      allow(source).to receive(:connector_instance).and_return(double(discover: same_name))
+      source.discover!
+      source.discover!
+
+      expect(source.streams.pluck(:destination_table)).to contain_exactly("pagila__data", "pagila__data_2")
+    end
   end
 end

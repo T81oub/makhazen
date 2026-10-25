@@ -35,11 +35,7 @@ class Source < ApplicationRecord
     found_ids = connector_instance.discover.map do |table|
       stream = streams.find_or_initialize_by(schema_name: table[:schema], name: table[:name])
 
-      if table[:destination]
-        stream.destination_table ||= "#{name}__#{table[:destination]}"
-      else
-        stream.destination_table ||= Stream.destination_table_for(name, table[:schema], table[:name])
-      end
+      stream.destination_table ||= Stream.available_destination_table(destination_for(table))
 
       stream.update!(source_columns: table[:columns], source_primary_key: table[:primary_key], removed_at: nil)
       stream.id
@@ -59,5 +55,13 @@ class Source < ApplicationRecord
 
   def connector_instance
     CONNECTOR_CLASSES.fetch(connector).new(config)
+  end
+
+  private
+
+  def destination_for(table)
+    return "#{name}__#{table[:destination]}" if table[:destination]
+
+    Stream.destination_table_for(name, table[:schema], table[:name])
   end
 end

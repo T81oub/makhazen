@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_21_212626) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_25_204929) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -34,6 +34,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_21_212626) do
     t.datetime "removed_at"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.index ["destination_table"], name: "index_streams_on_destination_table", unique: true
     t.index ["source_id", "schema_name", "name"], name: "index_streams_on_source_id_and_schema_name_and_name", unique: true
     t.index ["source_id"], name: "index_streams_on_source_id"
   end
