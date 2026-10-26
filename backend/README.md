@@ -56,3 +56,13 @@ Warehouse::Raw.db.tables(schema: :raw)
 Warehouse::Raw.db[Sequel[:raw][:waste__ds_dechet_services_data]].first(3)
 
 ```
+
+```ruby
+s = Source.create!(name: "test_http", connector: "http",
+                   config: { "urls" => ["https://www.data.gouv.fr/api/1/datasets/r/63379d67-452f-4cb3-8788-1703bddabaef"] })
+s.connector_instance.check
+s.discover!
+s.streams.update_all(selected: true)
+s.sync!
+
+```
