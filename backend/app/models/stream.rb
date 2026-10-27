@@ -16,21 +16,34 @@ class Stream < ApplicationRecord
 
   def sync!
     sync = syncs.create!(started_at: Time.current)
-
-    # TODO: shouldn't drop all the table while sync
-    Warehouse::Raw.db.drop_table?(Warehouse::Raw.table(self))
-    Warehouse::Raw.create_table(self)
-
     count = 0
 
-    source.connector_instance.read(self) do |batch|
-      Warehouse::Raw.load(self, batch)
-      count += batch.size
+    if updated_at_attr.present?
+      Warehouse::Raw.create_or_update_table(self)
+      newest = nil
+
+      source.connector_instance.read(self) do |batch|
+        Warehouse::Raw.load(self, batch)
+        count += batch.size
+      end
+
+      newest = Warehouse::Raw.db[Warehouse::Raw.table(self)].max(updated_at_attr.to_sym)
+      update!(last_sync: newest.iso8601(6)) if newest
+    else
+      Warehouse::Raw.create_loading_table(self)
+
+      source.connector_instance.read(self) do |batch|
+        Warehouse::Raw.load_loading(self, batch)
+        count += batch.size
+      end
+
+      Warehouse::Raw.swap(self)
     end
 
     sync.update!(status: "succeeded", rows_loaded: count, finished_at: Time.current)
     sync
   rescue => e
+    Warehouse::Raw.drop_loading_table(self)
     sync&.update!(status: "failed", error: e.message, finished_at: Time.current)
     raise
   end

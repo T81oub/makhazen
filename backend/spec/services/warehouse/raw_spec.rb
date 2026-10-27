@@ -31,7 +31,7 @@ RSpec.describe Connectors::Postgres, :integration do
   end
 
   it "#create_table" do
-    Warehouse::Raw.create_table(build_stream)
+    Warehouse::Raw.create_or_update_table(build_stream)
     columns = Warehouse::Base.db.schema(Sequel[:raw][:pagila__film_actor]).map(&:first)
     expect(columns).to eq([ :actor_id, :film_id ])
   end
@@ -39,10 +39,20 @@ RSpec.describe Connectors::Postgres, :integration do
   it "#load" do
     stream = build_stream
 
-    Warehouse::Raw.create_table(stream)
+    Warehouse::Raw.create_or_update_table(stream)
     Warehouse::Raw.load(stream, [ { actor_id: 1, film_id: 10 }, { actor_id: 2, film_id: 20 } ])
 
     expect(Warehouse::Base.db.schema(Sequel[:raw][:pagila__film_actor]).count).to eq(2)
+  end
+
+  it "#load ignores a row already there when the table is only a primary key" do
+    stream = build_stream
+
+    Warehouse::Raw.create_or_update_table(stream)
+    Warehouse::Raw.load(stream, [ { actor_id: 1, film_id: 10 } ])
+    Warehouse::Raw.load(stream, [ { actor_id: 1, film_id: 10 }, { actor_id: 2, film_id: 20 } ])
+
+    expect(Warehouse::Base.db[Sequel[:raw][:pagila__film_actor]].count).to eq(2)
   end
 
   after { Warehouse::Base.db.drop_table?(Sequel[:raw][:pagila__film_actor]) }

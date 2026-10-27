@@ -122,5 +122,23 @@ RSpec.describe Connectors::Postgres, :integration do
       penelope = read_all("actor").flatten.find { |row| row[:actor_id] == 1 }
       expect(penelope).to include(first_name: "PENELOPE", last_name: "GUINESS")
     end
+
+    it "reads only the rows newer than last_sync" do
+      stream = Stream.new(schema_name: "public", name: "payment",
+                          updated_at_attr: "payment_date", last_sync: "2022-07-01T00:00:00Z")
+      rows = []
+      connector.read(stream) { |batch| rows.concat(batch) }
+
+      expect(rows.size).to eq(2334)
+      expect(rows.map { |row| row[:payment_date] }).to all(be > Time.utc(2022, 7, 1))
+    end
+
+    it "reads every row when there is no last_sync yet" do
+      stream = Stream.new(schema_name: "public", name: "payment", updated_at_attr: "payment_date")
+      rows = []
+      connector.read(stream) { |batch| rows.concat(batch) }
+
+      expect(rows.size).to eq(16049)
+    end
   end
 end

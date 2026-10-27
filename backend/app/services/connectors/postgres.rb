@@ -40,7 +40,13 @@ module Connectors
 
     def read(stream)
       with_connection do |db|
-        db[Sequel[stream.schema_name.to_sym][stream.name.to_sym]].paged_each(rows_per_fetch: 1000).each_slice(1000) do |batch|
+        data = db[Sequel[stream.schema_name.to_sym][stream.name.to_sym]]
+
+        if stream.updated_at_attr.present? && stream.last_sync.present?
+          data = data.where(Sequel[stream.updated_at_attr.to_sym] > stream.last_sync)
+        end
+
+        data.paged_each(rows_per_fetch: 1000).each_slice(1000) do |batch|
           yield batch
         end
       end

@@ -70,4 +70,95 @@ RSpec.describe Stream, "#sync!", :integration do
       expect(sync.finished_at).to be_present
     end
   end
+
+  it "keeps the previous copy when a sync fails" do
+    stream.sync!
+    allow(connector).to receive(:read).and_raise(Connectors::ConnectionError, "connection lost")
+
+    expect { stream.sync! }.to raise_error(Connectors::ConnectionError)
+    expect(raw_table.count).to eq(3)
+  end
+
+  it "never leaves a half-loaded table" do
+    stream.sync!
+    allow(connector).to receive(:read) do |_stream, &block|
+      block.call([ { actor_id: 9, first_name: "NEW" } ])
+      raise Connectors::ConnectionError, "connection lost"
+    end
+
+    expect { stream.sync! }.to raise_error(Connectors::ConnectionError)
+    expect(raw_table.order(:actor_id).select_map(:first_name)).to eq(%w[PENELOPE NICK ED])
+  end
+
+  context "with updated_at_attr (incremental)" do
+    let(:monday) { Time.utc(2026, 10, 26, 9, 0, 0) }
+    let(:tuesday) { Time.utc(2026, 10, 27, 9, 0, 0) }
+    let(:stream) do
+      source.streams.create!(
+        schema_name: "public",
+        name: "actor",
+        destination_table: "pagila__actor",
+        source_columns: [
+          { "name" => "actor_id", "type" => "integer", "nullable" => false },
+          { "name" => "first_name", "type" => "text", "nullable" => false },
+          { "name" => "last_update", "type" => "timestamp with time zone", "nullable" => false }
+        ],
+        source_primary_key: [ "actor_id" ],
+        updated_at_attr: "last_update"
+      )
+    end
+
+    before do
+      allow(connector).to receive(:read).and_yield([
+        { actor_id: 1, first_name: "PENELOPE", last_update: monday },
+        { actor_id: 2, first_name: "NICK", last_update: monday }
+      ])
+    end
+
+    it "saves the newest value as last_sync" do
+      stream.sync!
+      expect(Time.iso8601(stream.reload.last_sync)).to eq(monday)
+    end
+
+    it "updates changed rows and adds new ones, without duplicates" do
+      stream.sync!
+      allow(connector).to receive(:read).and_yield([
+        { actor_id: 1, first_name: "PENNY", last_update: tuesday },
+        { actor_id: 3, first_name: "ED", last_update: tuesday }
+      ])
+      stream.sync!
+
+      expect(raw_table.order(:actor_id).select_map(:first_name)).to eq(%w[PENNY NICK ED])
+      expect(Time.iso8601(stream.reload.last_sync)).to eq(tuesday)
+    end
+
+    it "keeps every row and last_sync when nothing changed" do
+      stream.sync!
+      allow(connector).to receive(:read)
+      sync = stream.sync!
+
+      expect(sync.rows_loaded).to eq(0)
+      expect(raw_table.count).to eq(2)
+      expect(Time.iso8601(stream.reload.last_sync)).to eq(monday)
+    end
+
+    it "does not move last_sync when a sync fails" do
+      stream.sync!
+      allow(connector).to receive(:read).and_raise(Connectors::ConnectionError, "connection lost")
+
+      expect { stream.sync! }.to raise_error(Connectors::ConnectionError)
+      expect(Time.iso8601(stream.reload.last_sync)).to eq(monday)
+      expect(stream.syncs.last).to be_failed
+    end
+
+    it "can switch a full refresh stream to incremental" do
+      stream.update!(updated_at_attr: nil)
+      stream.sync!
+      stream.update!(updated_at_attr: "last_update")
+      allow(connector).to receive(:read).and_yield([ { actor_id: 1, first_name: "PENNY", last_update: tuesday } ])
+      stream.sync!
+
+      expect(raw_table.order(:actor_id).select_map(:first_name)).to eq(%w[PENNY NICK])
+    end
+  end
 end
