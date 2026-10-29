@@ -161,4 +161,26 @@ RSpec.describe Stream, "#sync!", :integration do
       expect(raw_table.order(:actor_id).select_map(:first_name)).to eq(%w[PENNY NICK])
     end
   end
+
+  context "when the connector says the file has not changed" do
+    it "keeps the previous copy" do
+      stream.sync!
+      allow(connector).to receive(:read).and_return(:unchanged)
+      sync = stream.sync!
+
+      expect(sync).to be_succeeded
+      expect(sync.rows_loaded).to eq(0)
+      expect(raw_table.count).to eq(3)
+    end
+  end
+
+  it "saves the sha256 the connector found" do
+    allow(connector).to receive(:read) do |s, &block|
+      block.call([ { actor_id: 1, first_name: "PENELOPE" } ])
+      s.last_sha256 = "abc123"
+    end
+    stream.sync!
+
+    expect(stream.reload.last_sha256).to eq("abc123")
+  end
 end

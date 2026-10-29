@@ -32,12 +32,17 @@ class Stream < ApplicationRecord
     else
       Warehouse::Raw.create_loading_table(self)
 
-      source.connector_instance.read(self) do |batch|
+      result = source.connector_instance.read(self) do |batch|
         Warehouse::Raw.load_loading(self, batch)
         count += batch.size
       end
 
-      Warehouse::Raw.swap(self)
+      if result == :unchanged
+        Warehouse::Raw.drop_loading_table(self)
+      else
+        Warehouse::Raw.swap(self)
+        save!
+      end
     end
 
     sync.update!(status: "succeeded", rows_loaded: count, finished_at: Time.current)

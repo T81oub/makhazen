@@ -75,6 +75,16 @@ RSpec.describe Connectors::Http do
       expect { read_all(connector, "https://example.com/old.csv", "old") }
         .to raise_error(Connectors::ConnectionError, /old.csv is gone/)
     end
+
+    it "skips a file that has not changed" do
+      stream = Stream.new(schema_name: csv_url, name: "waste", last_sha256: Digest::SHA256.hexdigest(csv))
+      rows = []
+
+      result = connector.read(stream) { |batch| rows.concat(batch) }
+
+      expect(result).to eq(:unchanged)
+      expect(rows).to be_empty
+    end
   end
 
   describe "authentication" do

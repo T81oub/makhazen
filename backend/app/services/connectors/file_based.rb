@@ -34,7 +34,11 @@ module Connectors
         path = files_of(location, dir).find { |file| stream_name(file) == stream.name }
         raise ConnectionError, "#{stream.name} is no longer in #{stream.schema_name}" unless path
 
+        sha256 = Digest::SHA256.file(path).hexdigest
+        return :unchanged if sha256 == stream.last_sha256
+
         Files::Reader.new(path).each_batch(size: BATCH_SIZE) { |batch| yield batch }
+        stream.last_sha256 = sha256
       end
     end
 
@@ -49,10 +53,12 @@ module Connectors
       nil
     end
 
-    # Downloads a location and gives the data files inside it.
+    def fetch(location, dir)
+      Files::Fetcher.new(location[:url], into: dir, auth: auth).fetch
+    end
+
     def files_of(location, dir)
-      download = Files::Fetcher.new(location[:url], into: dir, auth: auth).fetch
-      Files::Unpacker.new(download.path, into: dir).files
+      Files::Unpacker.new(fetch(location, dir).path, into: dir).files
     end
 
     # "DS_DECHET_SERVICES_data.csv" => "ds_dechet_services_data"
