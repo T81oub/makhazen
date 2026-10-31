@@ -1,4 +1,6 @@
 class Stream < ApplicationRecord
+  class GoneFromSource < StandardError; end
+
   belongs_to :source
   has_many :syncs, dependent: :destroy
 
@@ -26,6 +28,15 @@ class Stream < ApplicationRecord
   def sync!
     sync = syncs.create!(started_at: Time.current)
     count = 0
+
+    table = source.connector_instance.discover.find { |t| t[:schema] == schema_name && t[:name] == name }
+
+    unless table
+      update!(removed_at: Time.current)
+      raise GoneFromSource, "#{schema_name}.#{name} is no longer in the source"
+    end
+
+    update!(source_columns: table[:columns].map(&:stringify_keys), source_primary_key: table[:primary_key])
 
     if updated_at_attr.present?
       Warehouse::Raw.create_or_update_table(self)

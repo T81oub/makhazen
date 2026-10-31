@@ -32,6 +32,9 @@ RSpec.describe Source, "#sync!", :integration do
 
   before do
     allow(source).to receive(:connector_instance).and_return(connector)
+    allow(connector).to receive(:discover) do
+      source.streams.map { |s| { schema: s.schema_name, name: s.name, columns: s.source_columns, primary_key: s.source_primary_key } }
+    end
     allow(connector).to receive(:read).and_yield([ { id: 1 }, { id: 2 } ])
   end
 

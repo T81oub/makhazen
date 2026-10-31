@@ -31,6 +31,9 @@ RSpec.describe Stream, "#sync!", :integration do
 
   before do
     allow(stream.source).to receive(:connector_instance).and_return(connector)
+    allow(connector).to receive(:discover) do
+      [ { schema: stream.schema_name, name: stream.name, columns: stream.source_columns, primary_key: stream.source_primary_key } ]
+    end
     allow(connector).to receive(:read)
       .and_yield([ { actor_id: 1, first_name: "PENELOPE" }, { actor_id: 2, first_name: "NICK" } ])
       .and_yield([ { actor_id: 3, first_name: "ED" } ])
@@ -182,5 +185,57 @@ RSpec.describe Stream, "#sync!", :integration do
     stream.sync!
 
     expect(stream.reload.last_sha256).to eq("abc123")
+  end
+
+  context "when the source adds a column" do
+    let(:monday) { Time.utc(2026, 10, 26, 9, 0, 0) }
+    let(:tuesday) { Time.utc(2026, 10, 27, 9, 0, 0) }
+    let(:role) { { "name" => "role", "type" => "text", "nullable" => true } }
+    let(:stream) do
+      source.streams.create!(
+        schema_name: "public",
+        name: "actor",
+        destination_table: "pagila__actor",
+        source_columns: [
+          { "name" => "actor_id", "type" => "integer", "nullable" => false },
+          { "name" => "first_name", "type" => "text", "nullable" => false },
+          { "name" => "last_update", "type" => "timestamp with time zone", "nullable" => false }
+        ],
+        source_primary_key: [ "actor_id" ],
+        updated_at_attr: "last_update"
+      )
+    end
+
+    before do
+      allow(connector).to receive(:read).and_yield([
+        { actor_id: 1, first_name: "ALEX", last_update: monday },
+        { actor_id: 2, first_name: "JOHN", last_update: monday }
+      ])
+    end
+
+    it "adds the column to the stream and to the warehouse table" do
+      stream.sync!
+
+      allow(connector).to receive(:discover).and_return([
+        { schema: "public", name: "actor", columns: stream.source_columns + [ role ], primary_key: [ "actor_id" ] }
+      ])
+      allow(connector).to receive(:read).and_yield([
+        { actor_id: 3, first_name: "PENELOPE", last_update: tuesday, role: "teacher" }
+      ])
+      stream.sync!
+
+      expect(stream.reload.source_columns.map { |c| c["name"] }).to eq(["actor_id", "first_name", "last_update", "role"])
+      expect(raw_table.order(:actor_id).select_map(:role)).to eq([ nil, nil, "teacher" ])
+    end
+  end
+
+  context "when the table is gone from the source" do
+    before { allow(connector).to receive(:discover).and_return([]) }
+
+    it "fails the sync and marks the stream as removed" do
+      expect { stream.sync! }.to raise_error(Stream::GoneFromSource)
+      expect(stream.syncs.last).to be_failed
+      expect(stream.reload).to be_removed
+    end
   end
 end
