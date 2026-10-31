@@ -7,11 +7,20 @@ class Stream < ApplicationRecord
   validates :destination_table, presence: true, uniqueness: true, length: { maximum: 63 },
                                 format: { with: /\A[a-z][a-z0-9_]*\z/ }
 
+  SYNC_INTERVALS = { "hourly" => 1.hour, "daily" => 1.day, "monthly" => 1.month }.freeze
+
+  enum :sync_every, { hourly: "hourly", daily: "daily", monthly: "monthly" }, validate: true
+
   scope :active, -> { where(removed_at: nil) }
   scope :to_sync, -> { active.where(selected: true) }
+  scope :due, -> { to_sync.where("next_sync_at IS NULL OR next_sync_at <= ?", Time.current) }
 
   def removed?
     removed_at.present?
+  end
+
+  def schedule_next_sync!
+    update!(next_sync_at: Time.current + SYNC_INTERVALS.fetch(sync_every))
   end
 
   def sync!

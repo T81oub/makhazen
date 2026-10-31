@@ -98,6 +98,23 @@ RSpec.describe Stream, type: :model do
     end
   end
 
+  describe "sync_every" do
+    it "is daily by default" do
+      expect(build_stream.sync_every).to eq("daily")
+    end
+
+    it "accepts hourly and monthly" do
+      expect(build_stream(sync_every: "hourly")).to be_valid
+      expect(build_stream(sync_every: "monthly")).to be_valid
+    end
+
+    it "refuses anything else" do
+      stream = build_stream(sync_every: "weekly")
+      expect(stream).not_to be_valid
+      expect(stream.errors[:sync_every]).to include("is not included in the list")
+    end
+  end
+
   describe "destination_table" do
     it "is required" do
       expect(build_stream(destination_table: nil)).not_to be_valid

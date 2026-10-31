@@ -42,6 +42,17 @@ Configs are encrypted in the database.
 
 Deleted rows in the source are not detected in incremental mode.
 
+## Scheduled syncs
+
+Each stream has a `sync_every`: `hourly`, `daily` (default) or `monthly`. Every hour, `SyncDueStreamsJob` starts a `SyncStreamJob` for each selected stream whose `next_sync_at` has passed, then plans its next sync. A stream that was never synced runs at the next tick.
+
+```ruby
+stream.update!(selected: true, sync_every: "hourly")
+SyncDueStreamsJob.perform_now
+```
+
+The jobs run in Solid Queue, inside Puma (`SOLID_QUEUE_IN_PUMA`), so `./start` is enough.
+
 ## Try it for real
 
 ```bash
