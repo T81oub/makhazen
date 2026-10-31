@@ -30,9 +30,9 @@ module Files
       "VARCHAR"   => "text"
     }.freeze
 
-    def initialize(path, format: File.extname(path).delete(".").downcase)
-      @path = path
+    def initialize(path, format: File.extname(path).delete(".").downcase, encoding: nil)
       @read_function = READ_FUNCTIONS.fetch(format)
+      @path = read_function == "read_csv" ? to_utf8(path, encoding || detect_encoding(path)) : path
       @connection = DuckDB::Database.open.connect
     end
 
@@ -57,6 +57,33 @@ module Files
 
     def select_all
       "SELECT * FROM #{read_function}(?)"
+    end
+
+    def detect_encoding(file)
+      head = File.binread(file, 2).to_s
+      return "UTF-16LE" if head == "\xFF\xFE".b
+      return "UTF-16BE" if head == "\xFE\xFF".b
+      return "UTF-8" if utf8?(file)
+
+      "Windows-1252"
+    end
+
+    def utf8?(file)
+      File.foreach(file, mode: "rb") do |line|
+        return false unless line.force_encoding(Encoding::UTF_8).valid_encoding?
+      end
+      true
+    end
+
+    def to_utf8(file, encoding)
+      return file if Encoding.find(encoding) == Encoding::UTF_8
+
+      @utf8_copy = Tempfile.new([ "utf8", ".csv" ])
+      File.foreach(file, mode: "r:BOM|#{encoding}:UTF-8", invalid: :replace, undef: :replace) do |line|
+        @utf8_copy.write(line)
+      end
+      @utf8_copy.close
+      @utf8_copy.path
     end
 
     def postgres_type(duck_type)

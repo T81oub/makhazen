@@ -21,6 +21,22 @@ RSpec.describe Files::Reader do
     end
   end
 
+  describe "with French accents" do
+    def first_row(fixture)
+      rows = []
+      described_class.new(file_fixture(fixture).to_s).each_batch(size: 1000) { |batch| rows.concat(batch) }
+      rows.first
+    end
+
+    it "reads a UTF-8 file" do
+      expect(first_row("waste_sample_2.csv")).to include("CONF_STATUS" => "éûè", "TIME_PERIOD" => 2022)
+    end
+
+    it "reads a Latin-1 file and gives the text back in UTF-8" do
+      expect(first_row("waste_sample_latin1.csv")).to include("CONF_STATUS" => "éûè", "TIME_PERIOD" => 2022)
+    end
+  end
+
   describe "with a Parquet file" do
     let(:reader) { described_class.new(file_fixture("waste_sample.parquet").to_s) }
 
