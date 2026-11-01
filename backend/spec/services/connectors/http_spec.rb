@@ -64,7 +64,7 @@ RSpec.describe Connectors::Http do
     it "gives every row of the file as a Hash" do
       rows = read_all(connector, csv_url, "waste")
       expect(rows.size).to eq(3)
-      expect(rows.first).to include("QUALI_WASTE" => "_Z", "TIME_PERIOD" => 2022)
+      expect(rows.first).to include("QUALI_WASTE" => "_Z", "TIME_PERIOD" => "2022")
     end
 
     it "reads a file inside a zip" do

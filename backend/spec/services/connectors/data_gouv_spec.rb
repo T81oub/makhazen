@@ -58,7 +58,7 @@ RSpec.describe Connectors::DataGouv do
     it "describes the columns of each file" do
       data = streams.find { |s| s[:name] == "ds_dechet_services_data" }
       expect(data[:columns].size).to eq(13)
-      expect(data[:columns].last).to eq({ name: "OBS_VALUE", type: "bigint", nullable: true })
+      expect(data[:columns].last).to eq({ name: "OBS_VALUE", type: "text", nullable: true })
     end
 
     it "skips a resource it can't download" do
@@ -81,7 +81,7 @@ RSpec.describe Connectors::DataGouv do
     it "gives every row of the file as a Hash" do
       rows = read_all("res-zip", "ds_dechet_services_data")
       expect(rows.size).to eq(3)
-      expect(rows.first).to include("QUALI_WASTE" => "_Z", "TIME_PERIOD" => 2022)
+      expect(rows.first).to include("QUALI_WASTE" => "_Z", "TIME_PERIOD" => "2022")
     end
 
     it "reads the right file when a zip has several" do

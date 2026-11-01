@@ -56,6 +56,8 @@ module Files
     attr_reader :path, :read_function, :connection
 
     def select_all
+      return "SELECT * FROM read_csv(?, all_varchar = true)" if read_function == "read_csv"
+
       "SELECT * FROM #{read_function}(?)"
     end
 
