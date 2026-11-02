@@ -68,6 +68,29 @@ RSpec.describe Connectors::Postgres, :integration do
       end
     end
 
+    context "with types that only exist in the source" do
+      let(:film) { connector.discover.find { |s| s[:name] == "film" } }
+      let(:types) { film[:columns].to_h { |c| [ c[:name], c[:type] ] } }
+
+      it "stores a domain as the type it is built on" do
+        expect(types["release_year"]).to eq("integer")
+      end
+
+      it "stores an enum as text" do
+        expect(types["rating"]).to eq("text")
+      end
+
+      it "keeps the types Postgres knows everywhere" do
+        expect(types).to include("title" => "text", "rental_rate" => "numeric(4,2)", "special_features" => "text[]")
+      end
+
+      it "only gives types the warehouse can create" do
+        film[:columns].each do |column|
+          expect { Warehouse::Base.db.get(Sequel.lit("NULL::#{column[:type]}")) }.not_to raise_error, column[:name]
+        end
+      end
+    end
+
     context "when the connection fails" do
       it "raises a ConnectionError" do
         expect { connector(password: "wrong").discover }
