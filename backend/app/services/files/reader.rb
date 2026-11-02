@@ -37,13 +37,13 @@ module Files
     end
 
     def columns
-      connection.query("DESCRIBE #{select_all}", path).to_a.map do |name, type, null|
+      @columns ||= connection.query("DESCRIBE SELECT * FROM #{source}", path).to_a.map do |name, type, null|
         { name: name, type: postgres_type(type), nullable: null == "YES" }
       end
     end
 
     def each_batch(size:)
-      result = connection.query(select_all, path)
+      result = connection.query("SELECT #{select_list} FROM #{source}", path)
       names = result.columns.map(&:name)
 
       result.each_slice(size) do |rows|
@@ -55,10 +55,17 @@ module Files
 
     attr_reader :path, :read_function, :connection
 
-    def select_all
-      return "SELECT * FROM read_csv(?, all_varchar = true)" if read_function == "read_csv"
+    def source
+      return "read_csv(?, all_varchar = true)" if read_function == "read_csv"
 
-      "SELECT * FROM #{read_function}(?)"
+      "#{read_function}(?)"
+    end
+
+    def select_list
+      columns.map do |column|
+        name = "\"#{column[:name].gsub('"', '""')}\""
+        column[:type] == "jsonb" ? "to_json(#{name}) AS #{name}" : name
+      end.join(", ")
     end
 
     def detect_encoding(file)
@@ -90,6 +97,7 @@ module Files
 
     def postgres_type(duck_type)
       return duck_type.sub("DECIMAL", "numeric") if duck_type.start_with?("DECIMAL")
+      return "jsonb" if duck_type.start_with?("STRUCT", "MAP", "UNION", "JSON") || duck_type.end_with?("]")
 
       TYPES.fetch(duck_type, "text")
     end

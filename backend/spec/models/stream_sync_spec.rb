@@ -224,7 +224,7 @@ RSpec.describe Stream, "#sync!", :integration do
       ])
       stream.sync!
 
-      expect(stream.reload.source_columns.map { |c| c["name"] }).to eq(["actor_id", "first_name", "last_update", "role"])
+      expect(stream.reload.source_columns.map { |c| c["name"] }).to eq([ "actor_id", "first_name", "last_update", "role" ])
       expect(raw_table.order(:actor_id).select_map(:role)).to eq([ nil, nil, "teacher" ])
     end
   end

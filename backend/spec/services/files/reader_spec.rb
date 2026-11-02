@@ -83,4 +83,30 @@ RSpec.describe Files::Reader do
       expect { described_class.new("data.zip") }.to raise_error(KeyError, /zip/)
     end
   end
+
+  describe "with nested JSON" do
+    let(:file) do
+      Tempfile.new([ "nested", ".json" ]).tap do |f|
+        f.write('[{"id": 1, "address": {"city": "Paris", "zip": "75001"}, "tags": ["a", "b"]}]')
+        f.close
+      end
+    end
+    let(:reader) { described_class.new(file.path) }
+
+    after { file.unlink }
+
+    it "describes objects and arrays as jsonb" do
+      types = reader.columns.to_h { |c| [ c[:name], c[:type] ] }
+      expect(types).to include("address" => "jsonb", "tags" => "jsonb")
+    end
+
+    it "gives objects and arrays back as JSON text that Postgres can store" do
+      rows = []
+      reader.each_batch(size: 1000) { |batch| rows.concat(batch) }
+
+      expect(rows.first["address"]).to be_a(String)
+      expect(JSON.parse(rows.first["address"])).to eq("city" => "Paris", "zip" => "75001")
+      expect(JSON.parse(rows.first["tags"])).to eq([ "a", "b" ])
+    end
+  end
 end
