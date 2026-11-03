@@ -88,7 +88,8 @@ module Files
       return file if Encoding.find(encoding) == Encoding::UTF_8
 
       @utf8_copy = Tempfile.new([ "utf8", ".csv" ])
-      File.foreach(file, mode: "r:BOM|#{encoding}:UTF-8", invalid: :replace, undef: :replace) do |line|
+      mode = encoding.start_with?("UTF") ? "r:BOM|#{encoding}:UTF-8" : "r:#{encoding}:UTF-8"
+      File.foreach(file, mode: mode, invalid: :replace, undef: :replace) do |line|
         @utf8_copy.write(line)
       end
       @utf8_copy.close
