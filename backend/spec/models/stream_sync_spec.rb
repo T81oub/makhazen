@@ -238,4 +238,40 @@ RSpec.describe Stream, "#sync!", :integration do
       expect(stream.reload).to be_removed
     end
   end
+
+  context "when another sync of the same stream is running" do
+    let(:other) do
+      params = ActiveRecord::Base.connection.raw_connection.conninfo_hash
+      PG.connect(params.slice(:host, :port, :dbname, :user, :password))
+    end
+
+    def lock_free?
+      free = other.exec("SELECT pg_try_advisory_lock(#{stream.id})").getvalue(0, 0) == "t"
+      other.exec("SELECT pg_advisory_unlock(#{stream.id})") if free
+      free
+    end
+
+    after { other.close }
+
+    it "refuses to start and leaves the other sync's work alone" do
+      other.exec("SELECT pg_advisory_lock(#{stream.id})")
+
+      expect { stream.sync! }.to raise_error(Stream::SyncInProgress)
+      expect(stream.syncs).to be_empty
+    ensure
+      other.exec("SELECT pg_advisory_unlock(#{stream.id})")
+    end
+
+    it "releases the lock when the sync succeeds" do
+      stream.sync!
+      expect(lock_free?).to be(true)
+    end
+
+    it "releases the lock when the sync fails" do
+      allow(connector).to receive(:read).and_raise(Connectors::ConnectionError, "connection lost")
+
+      expect { stream.sync! }.to raise_error(Connectors::ConnectionError)
+      expect(lock_free?).to be(true)
+    end
+  end
 end

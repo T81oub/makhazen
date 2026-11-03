@@ -1,5 +1,6 @@
 class Stream < ApplicationRecord
   class GoneFromSource < StandardError; end
+  class SyncInProgress < StandardError; end
 
   belongs_to :source
   has_many :syncs, dependent: :destroy
@@ -26,51 +27,58 @@ class Stream < ApplicationRecord
   end
 
   def sync!
-    sync = syncs.create!(started_at: Time.current)
-    count = 0
+    locked = ActiveRecord::Base.connection.select_value("SELECT pg_try_advisory_lock(#{id})")
+    raise SyncInProgress, "#{schema_name}.#{name} is already syncing" unless locked
 
-    table = source.connector_instance.discover.find { |t| t[:schema] == schema_name && t[:name] == name }
+    begin
+      sync = syncs.create!(started_at: Time.current)
+      count = 0
 
-    unless table
-      update!(removed_at: Time.current)
-      raise GoneFromSource, "#{schema_name}.#{name} is no longer in the source"
-    end
+      table = source.connector_instance.discover.find { |t| t[:schema] == schema_name && t[:name] == name }
 
-    update!(source_columns: table[:columns].map(&:stringify_keys), source_primary_key: table[:primary_key])
-
-    if updated_at_attr.present?
-      Warehouse::Raw.create_or_update_table(self)
-      newest = nil
-
-      source.connector_instance.read(self) do |batch|
-        Warehouse::Raw.load(self, batch)
-        count += batch.size
+      unless table
+        update!(removed_at: Time.current)
+        raise GoneFromSource, "#{schema_name}.#{name} is no longer in the source"
       end
 
-      newest = Warehouse::Raw.db[Warehouse::Raw.table(self)].max(updated_at_attr.to_sym)
-      update!(last_sync: newest.iso8601(6)) if newest
-    else
-      Warehouse::Raw.create_loading_table(self)
+      update!(source_columns: table[:columns].map(&:stringify_keys), source_primary_key: table[:primary_key])
 
-      result = source.connector_instance.read(self) do |batch|
-        Warehouse::Raw.load_loading(self, batch)
-        count += batch.size
-      end
+      if updated_at_attr.present?
+        Warehouse::Raw.create_or_update_table(self)
+        newest = nil
 
-      if result == :unchanged
-        Warehouse::Raw.drop_loading_table(self)
+        source.connector_instance.read(self) do |batch|
+          Warehouse::Raw.load(self, batch)
+          count += batch.size
+        end
+
+        newest = Warehouse::Raw.db[Warehouse::Raw.table(self)].max(updated_at_attr.to_sym)
+        update!(last_sync: newest.iso8601(6)) if newest
       else
-        Warehouse::Raw.swap(self)
-        save!
-      end
-    end
+        Warehouse::Raw.create_loading_table(self)
 
-    sync.update!(status: "succeeded", rows_loaded: count, finished_at: Time.current)
-    sync
-  rescue => e
-    Warehouse::Raw.drop_loading_table(self)
-    sync&.update!(status: "failed", error: e.message, finished_at: Time.current)
-    raise
+        result = source.connector_instance.read(self) do |batch|
+          Warehouse::Raw.load_loading(self, batch)
+          count += batch.size
+        end
+
+        if result == :unchanged
+          Warehouse::Raw.drop_loading_table(self)
+        else
+          Warehouse::Raw.swap(self)
+          save!
+        end
+      end
+
+      sync.update!(status: "succeeded", rows_loaded: count, finished_at: Time.current)
+      sync
+    rescue => e
+      Warehouse::Raw.drop_loading_table(self)
+      sync&.update!(status: "failed", error: e.message, finished_at: Time.current)
+      raise
+    ensure
+      ActiveRecord::Base.connection.select_value("SELECT pg_advisory_unlock(#{id})")
+    end
   end
 
   def self.destination_table_for(source_name, schema_name, table_name)
