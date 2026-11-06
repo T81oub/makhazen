@@ -239,6 +239,26 @@ RSpec.describe Stream, "#sync!", :integration do
     end
   end
 
+  context "when an earlier sync was killed while running" do
+    let!(:stuck) { stream.syncs.create!(started_at: 1.hour.ago) }
+
+    it "marks it as failed before starting" do
+      stream.sync!
+
+      expect(stuck.reload).to be_failed
+      expect(stuck.error).to start_with("Interrupted")
+      expect(stuck.finished_at).to be_present
+    end
+
+    it "leaves the other streams' syncs alone" do
+      other = source.streams.create!(schema_name: "public", name: "film", destination_table: "pagila__film")
+      running = other.syncs.create!(started_at: 1.hour.ago)
+      stream.sync!
+
+      expect(running.reload).to be_running
+    end
+  end
+
   context "when another sync of the same stream is running" do
     let(:other) do
       params = ActiveRecord::Base.connection.raw_connection.conninfo_hash

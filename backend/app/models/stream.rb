@@ -31,6 +31,7 @@ class Stream < ApplicationRecord
     raise SyncInProgress, "#{schema_name}.#{name} is already syncing" unless locked
 
     begin
+      syncs.running.update_all(status: "failed", error: "Interrupted: the process stopped before the sync could finish", finished_at: Time.current)
       sync = syncs.create!(started_at: Time.current)
       count = 0
 
