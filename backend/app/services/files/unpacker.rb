@@ -9,6 +9,8 @@ module Files
     end
 
     def files
+      return [ path ] if data_file?(path)
+
       case File.binread(path, 2)
       when ZIP  then unzip
       when GZIP then [ gunzip ]

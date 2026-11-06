@@ -26,6 +26,11 @@ RSpec.describe Files::Unpacker do
   end
 
   describe "a plain data file" do
+    it "does not open an Excel file, even though it is a zip inside" do
+      xlsx = make_zip("waste.xlsx", "xl/workbook.xml" => "<workbook/>")
+      expect(unpack(xlsx)).to eq([ xlsx.to_s ])
+    end
+
     it "returns the file itself" do
       expect(unpack(csv)).to eq([ csv.to_s ])
     end

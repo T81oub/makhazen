@@ -3,7 +3,8 @@ module Files
     READ_FUNCTIONS = {
       "csv"     => "read_csv",
       "parquet" => "read_parquet",
-      "json"    => "read_json"
+      "json"    => "read_json",
+      "xlsx"    => "read_xlsx"
     }.freeze
 
     # DuckDB type => Postgres type. Anything else is stored as text.
@@ -34,6 +35,7 @@ module Files
       @read_function = READ_FUNCTIONS.fetch(format)
       @path = read_function == "read_csv" ? to_utf8(path, encoding || detect_encoding(path)) : path
       @connection = DuckDB::Database.open.connect
+      %w[INSTALL LOAD].each { |verb| connection.query("#{verb} excel") } if read_function == "read_xlsx"
     end
 
     def columns
@@ -56,7 +58,7 @@ module Files
     attr_reader :path, :read_function, :connection
 
     def source
-      return "read_csv(?, all_varchar = true)" if read_function == "read_csv"
+      return "#{read_function}(?, all_varchar = true)" if %w[read_csv read_xlsx].include?(read_function)
 
       "#{read_function}(?)"
     end

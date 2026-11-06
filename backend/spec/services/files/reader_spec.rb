@@ -107,6 +107,27 @@ RSpec.describe Files::Reader do
     end
   end
 
+  describe "with an Excel file" do
+    let(:path) { File.join(Dir.mktmpdir, "waste.xlsx") }
+    let(:reader) { described_class.new(path) }
+
+    before do
+      duckdb = DuckDB::Database.open.connect
+      %w[INSTALL LOAD].each { |verb| duckdb.query("#{verb} excel") }
+      duckdb.query("COPY (SELECT 'Paris' AS \"Ville\", 42 AS \"Tonnes\") TO '#{path}' (FORMAT xlsx, HEADER true)")
+    end
+
+    after { FileUtils.rm_rf(File.dirname(path)) }
+
+    it "reads the first sheet, with clean names, as text" do
+      rows = []
+      reader.each_batch(size: 10) { |batch| rows.concat(batch) }
+
+      expect(reader.columns.map { |c| c[:type] }).to all(eq("text"))
+      expect(rows).to eq([ { "ville" => "Paris", "tonnes" => "42" } ])
+    end
+  end
+
   describe "with a format it can't read" do
     it "raises a KeyError naming the format" do
       expect { described_class.new("data.zip") }.to raise_error(KeyError, /zip/)

@@ -35,6 +35,15 @@ RSpec.describe Files::Fetcher do
     expect(File.read(fetch.path)).to eq("ok")
   end
 
+  it "names the file after the URL it was redirected to" do
+    latest = "https://www.data.gouv.fr/fr/datasets/r/res-123"
+    stub_request(:get, latest).to_return(status: 302, headers: { "Location" => "https://static.data.gouv.fr/waste.xlsx" })
+    stub_request(:get, "https://static.data.gouv.fr/waste.xlsx").to_return(body: "ok")
+
+    download = described_class.new(latest, into: into).fetch
+    expect(File.basename(download.path)).to eq("waste.xlsx")
+  end
+
   it "retries when the server is briefly down" do
     stub_request(:get, url).to_return({ status: 503 }, { body: "ok" })
     expect(File.read(fetch.path)).to eq("ok")

@@ -13,7 +13,7 @@ module Files
     def fetch
       path = File.join(into, file_name)
 
-      File.open(path, "wb") do |file|
+      response = File.open(path, "wb") do |file|
         connection(file).get(url) do |request|
           request.options.on_data = proc do |chunk, _size, env|
             # Redirects and errors have a body too: only keep the real file.
@@ -22,7 +22,10 @@ module Files
         end
       end
 
-      Download.new(path: path, sha256: Digest::SHA256.file(path).hexdigest)
+      final_path = File.join(into, file_name(response.env.url.to_s))
+      File.rename(path, final_path)
+
+      Download.new(path: final_path, sha256: Digest::SHA256.file(final_path).hexdigest)
     rescue Faraday::Error => e
       raise FetchError, "#{url}: #{e.message}"
     end
@@ -52,8 +55,8 @@ module Files
       end
     end
 
-    def file_name
-      name = File.basename(URI(url).path)
+    def file_name(from = url)
+      name = File.basename(URI(from).path)
       name.match?(/\A\w[\w.-]*\z/) ? name : "download"
     end
   end
