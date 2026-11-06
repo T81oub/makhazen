@@ -34,6 +34,7 @@ class Stream < ApplicationRecord
       syncs.running.update_all(status: "failed", error: "Interrupted: the process stopped before the sync could finish", finished_at: Time.current)
       sync = syncs.create!(started_at: Time.current)
       count = 0
+      metadata = { _synced_at: sync.started_at, _sync_id: sync.id }
 
       table = source.connector_instance.discover.find { |t| t[:schema] == schema_name && t[:name] == name }
 
@@ -49,7 +50,7 @@ class Stream < ApplicationRecord
         newest = nil
 
         source.connector_instance.read(self) do |batch|
-          Warehouse::Raw.load(self, batch)
+          Warehouse::Raw.load(self, batch.map { |row| row.merge(metadata) })
           count += batch.size
         end
 
@@ -59,7 +60,7 @@ class Stream < ApplicationRecord
         Warehouse::Raw.create_loading_table(self)
 
         result = source.connector_instance.read(self) do |batch|
-          Warehouse::Raw.load_loading(self, batch)
+          Warehouse::Raw.load_loading(self, batch.map { |row| row.merge(metadata) })
           count += batch.size
         end
 

@@ -135,6 +135,14 @@ RSpec.describe Stream, "#sync!", :integration do
       expect(Time.iso8601(stream.reload.last_sync)).to eq(tuesday)
     end
 
+    it "stamps an updated row with the sync that changed it" do
+      first = stream.sync!
+      allow(connector).to receive(:read).and_yield([ { actor_id: 1, first_name: "PENNY", last_update: tuesday } ])
+      second = stream.sync!
+
+      expect(raw_table.order(:actor_id).select_map(:_sync_id)).to eq([ second.id, first.id ])
+    end
+
     it "keeps every row and last_sync when nothing changed" do
       stream.sync!
       allow(connector).to receive(:read)
@@ -237,6 +245,13 @@ RSpec.describe Stream, "#sync!", :integration do
       expect(stream.syncs.last).to be_failed
       expect(stream.reload).to be_removed
     end
+  end
+
+  it "stamps every row with the sync that loaded it" do
+    sync = stream.sync!
+
+    expect(raw_table.select_map(:_sync_id)).to all(eq(sync.id))
+    expect(raw_table.select_map(:_synced_at)).to all(be_within(1.second).of(sync.started_at))
   end
 
   context "when an earlier sync was killed while running" do

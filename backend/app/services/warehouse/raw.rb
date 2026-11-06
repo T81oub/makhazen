@@ -2,12 +2,16 @@ module Warehouse
   class Raw < Base
     SCHEMA = :raw
     LOADING_SCHEMA = :raw_loading
+    METADATA_COLUMNS = [
+      { "name" => "_synced_at", "type" => "timestamptz", "nullable" => true },
+      { "name" => "_sync_id", "type" => "bigint", "nullable" => true }
+    ].freeze
 
     def self.create_or_update_table(stream)
       table_name = table(stream)
 
       key = stream.source_primary_key.map(&:to_sym)
-      stream_columns = stream.source_columns
+      stream_columns = columns(stream)
 
       unless db.table_exists?(table_name)
         db.create_table(table(stream)) do
@@ -42,22 +46,20 @@ module Warehouse
       key = stream.source_primary_key.map(&:to_sym)
       return db[table(stream)].multi_insert(rows) if key.empty?
 
-      columns = stream.source_columns.map { |c| c["name"].to_sym } - key
-      update = columns.to_h { |column| [ column, Sequel[:excluded][column] ] }
+      names = columns(stream).map { |c| c["name"].to_sym } - key
+      update = names.to_h { |name| [ name, Sequel[:excluded][name] ] }
 
-      if update.empty?
-        db[table(stream)].insert_conflict(target: key).multi_insert(rows)
-      else
-        db[table(stream)].insert_conflict(target: key, update: update).multi_insert(rows)
-      end
+      db[table(stream)].insert_conflict(target: key, update: update).multi_insert(rows)
     end
 
     def self.create_loading_table(stream)
       db.create_schema(LOADING_SCHEMA, if_not_exists: true)
       db.drop_table?(loading_table(stream))
 
+      loading_columns = columns(stream)
+
       db.create_table(loading_table(stream)) do
-        stream.source_columns.each do |source_column|
+        loading_columns.each do |source_column|
           column source_column["name"].to_sym, source_column["type"], null: source_column["nullable"]
         end
       end
@@ -76,6 +78,10 @@ module Warehouse
 
     def self.drop_loading_table(stream)
       db.drop_table?(loading_table(stream))
+    end
+
+    def self.columns(stream)
+      stream.source_columns + METADATA_COLUMNS
     end
 
     def self.loading_table(stream)
