@@ -1,5 +1,11 @@
 # makhazen
 
+[![Backend](https://github.com/T81oub/makhazen/actions/workflows/backend.yml/badge.svg)](https://github.com/T81oub/makhazen/actions/workflows/backend.yml)
+![Ruby](https://img.shields.io/badge/ruby-3.4-CC342D?logo=ruby)
+![Rails](https://img.shields.io/badge/rails-8.1-D30001?logo=rubyonrails)
+![Postgres](https://img.shields.io/badge/postgres-16-4169E1?logo=postgresql&logoColor=white)
+![DuckDB](https://img.shields.io/badge/duckdb-1.5-FFF000?logo=duckdb&logoColor=black)
+
 makhazen is a small ELT platform. You connect a
 database or a file, makhazen copies it into a Postgres warehouse, and you
 read the data back through a REST API.

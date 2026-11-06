@@ -1,0 +1,91 @@
+name: Backend
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+defaults:
+  run:
+    working-directory: backend
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    container: ruby:3.4.11
+
+    services:
+      db:
+        image: postgres:16
+        env:
+          POSTGRES_USER: makhazen
+          POSTGRES_PASSWORD: makhazen
+        options: >-
+          --health-cmd "pg_isready -U makhazen"
+          --health-interval 2s --health-timeout 3s --health-retries 15
+      source_db:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: pagila
+        options: >-
+          --health-cmd "pg_isready -U postgres -d pagila"
+          --health-interval 2s --health-timeout 3s --health-retries 15
+
+    env:
+      RAILS_ENV: test
+      PGHOST: db
+      PGUSER: makhazen
+      PGPASSWORD: makhazen
+      DUCKDB_VERSION: 1.5.6
+      PAGILA_URL: https://raw.githubusercontent.com/devrimgunduz/pagila/pagila-v3.1.0
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install system packages
+        run: apt-get update -qq && apt-get install -y --no-install-recommends postgresql-client libvips unzip
+
+      - name: Install DuckDB
+        run: |
+          curl -fsSL -o /tmp/libduckdb.zip "https://github.com/duckdb/duckdb/releases/download/v${DUCKDB_VERSION}/libduckdb-linux-amd64.zip"
+          unzip -q /tmp/libduckdb.zip -d /tmp/libduckdb
+          mv /tmp/libduckdb/libduckdb.so /usr/local/lib/
+          mv /tmp/libduckdb/duckdb.h /tmp/libduckdb/duckdb.hpp /usr/local/include/
+          ldconfig
+
+      - name: Cache gems
+        uses: actions/cache@v4
+        with:
+          path: backend/vendor/bundle
+          key: gems-${{ hashFiles('backend/Gemfile.lock') }}
+
+      - name: Install gems
+        run: |
+          bundle config set path vendor/bundle
+          bundle install --jobs 4
+
+      - name: Load Pagila
+        env:
+          PGHOST: source_db
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          curl -fsSL "$PAGILA_URL/pagila-schema.sql" | psql -q -v ON_ERROR_STOP=1 -d pagila
+          curl -fsSL "$PAGILA_URL/pagila-data.sql" | psql -q -v ON_ERROR_STOP=1 -d pagila
+          psql -v ON_ERROR_STOP=1 -d pagila <<'SQL'
+            CREATE ROLE makhazen_reader LOGIN PASSWORD 'reader';
+            GRANT CONNECT ON DATABASE pagila TO makhazen_reader;
+            GRANT USAGE ON SCHEMA public TO makhazen_reader;
+            GRANT SELECT ON ALL TABLES IN SCHEMA public TO makhazen_reader;
+          SQL
+
+      - name: Create the databases
+        run: |
+          bin/rails db:prepare
+          createdb makhazen_warehouse_test
+          psql -v ON_ERROR_STOP=1 -d makhazen_warehouse_test -c "CREATE SCHEMA raw"
+
+      - name: Run tests
+        run: bin/rspec
