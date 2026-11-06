@@ -6,8 +6,8 @@ RSpec.describe Files::Reader do
   describe "#columns" do
     it "detects every column of the CSV with its Postgres type" do
       expect(reader.columns.size).to eq(13)
-      expect(reader.columns.first).to eq({ name: "QUALI_WASTE", type: "text", nullable: true })
-      expect(reader.columns.last).to eq({ name: "OBS_VALUE", type: "text", nullable: true })
+      expect(reader.columns.first).to eq({ name: "quali_waste", type: "text", nullable: true })
+      expect(reader.columns.last).to eq({ name: "obs_value", type: "text", nullable: true })
     end
   end
 
@@ -17,7 +17,7 @@ RSpec.describe Files::Reader do
       reader.each_batch(size: 1000) { |batch| rows.concat(batch) }
 
       expect(rows.size).to eq(3)
-      expect(rows.first).to include("QUALI_WASTE" => "_Z", "TIME_PERIOD" => "2022")
+      expect(rows.first).to include("quali_waste" => "_Z", "time_period" => "2022")
     end
   end
 
@@ -29,11 +29,11 @@ RSpec.describe Files::Reader do
     end
 
     it "reads a UTF-8 file" do
-      expect(first_row("waste_sample_2.csv")).to include("CONF_STATUS" => "éûè", "TIME_PERIOD" => "2022")
+      expect(first_row("waste_sample_2.csv")).to include("conf_status" => "éûè", "time_period" => "2022")
     end
 
     it "reads a Latin-1 file and gives the text back in UTF-8" do
-      expect(first_row("waste_sample_latin1.csv")).to include("CONF_STATUS" => "éûè", "TIME_PERIOD" => "2022")
+      expect(first_row("waste_sample_latin1.csv")).to include("conf_status" => "éûè", "time_period" => "2022")
     end
   end
 
@@ -67,14 +67,43 @@ RSpec.describe Files::Reader do
     end
 
     it "keeps the types written in the file" do
-      expect(reader.columns.last).to eq({ name: "OBS_VALUE", type: "bigint", nullable: true })
+      expect(reader.columns.last).to eq({ name: "obs_value", type: "bigint", nullable: true })
     end
 
     it "gives every row as a Hash" do
       rows = []
       reader.each_batch(size: 1000) { |batch| rows.concat(batch) }
       expect(rows.size).to eq(3)
-      expect(rows.first).to include("QUALI_WASTE" => "_Z", "TIME_PERIOD" => 2022)
+      expect(rows.first).to include("quali_waste" => "_Z", "time_period" => 2022)
+    end
+  end
+
+  describe "with odd column names" do
+    let(:long) { "Libellé de la commune de résidence du bénéficiaire principal du contrat" }
+    let(:file) do
+      Tempfile.new([ "names", ".csv" ]).tap do |f|
+        f.puts("Montant (€);Montant ($);Date de mise à jour;2022;#{long} A;#{long} B")
+        f.puts("1;2;2026-01-01;3;x;y")
+        f.close
+      end
+    end
+    let(:reader) { described_class.new(file.path) }
+
+    after { file.unlink }
+
+    it "gives clean, unique names that Postgres won't cut" do
+      names = reader.columns.map { |c| c[:name] }
+
+      expect(names.first(4)).to eq(%w[montant montant_2 date_de_mise_a_jour col_2022])
+      expect(names[5]).to eq("#{names[4]}_2")
+      expect(names).to all(satisfy { |name| name.length <= 63 })
+    end
+
+    it "uses the same names in the rows" do
+      rows = []
+      reader.each_batch(size: 10) { |batch| rows.concat(batch) }
+
+      expect(rows.first.keys).to eq(reader.columns.map { |c| c[:name] })
     end
   end
 

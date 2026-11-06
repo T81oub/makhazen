@@ -37,7 +37,7 @@ module Files
     end
 
     def columns
-      @columns ||= connection.query("DESCRIBE SELECT * FROM #{source}", path).to_a.map do |name, type, null|
+      @columns ||= described.zip(clean_names).map do |(_, type, null), name|
         { name: name, type: postgres_type(type), nullable: null == "YES" }
       end
     end
@@ -62,10 +62,27 @@ module Files
     end
 
     def select_list
-      columns.map do |column|
-        name = "\"#{column[:name].gsub('"', '""')}\""
-        column[:type] == "jsonb" ? "to_json(#{name}) AS #{name}" : name
+      described.zip(columns).map do |(original, *), column|
+        quoted = "\"#{original.gsub('"', '""')}\""
+        value = column[:type] == "jsonb" ? "to_json(#{quoted})" : quoted
+        "#{value} AS \"#{column[:name]}\""
       end.join(", ")
+    end
+
+    def described
+      @described ||= connection.query("DESCRIBE SELECT * FROM #{source}", path).to_a
+    end
+
+    def clean_names
+      described.each_with_object([]) do |(original, *), names|
+        base = ActiveSupport::Inflector.transliterate(original).downcase.gsub(/[^a-z0-9]+/, "_").delete_prefix("_").delete_suffix("_")
+        base = "col_#{base}".chomp("_") unless base.match?(/\A[a-z]/)
+        base = base[0, 59]
+        name = base
+        suffix = 1
+        name = "#{base}_#{suffix += 1}" while names.include?(name)
+        names << name
+      end
     end
 
     def detect_encoding(file)
