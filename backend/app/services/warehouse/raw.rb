@@ -42,14 +42,15 @@ module Warehouse
       end
     end
 
-    def self.load(stream, rows)
+    def self.load(stream)
+      all = columns(stream).map { |c| c["name"].to_sym }
+      from = db[loading_table(stream)].select(*all)
       key = stream.source_primary_key.map(&:to_sym)
-      return db[table(stream)].multi_insert(rows) if key.empty?
+      return db[table(stream)].insert(all, from) if key.empty?
 
-      names = columns(stream).map { |c| c["name"].to_sym } - key
-      update = names.to_h { |name| [ name, Sequel[:excluded][name] ] }
+      update = (all - key).to_h { |name| [ name, Sequel[:excluded][name] ] }
 
-      db[table(stream)].insert_conflict(target: key, update: update).multi_insert(rows)
+      db[table(stream)].insert_conflict(target: key, update: update).insert(all, from)
     end
 
     def self.create_loading_table(stream)

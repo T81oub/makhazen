@@ -36,11 +36,17 @@ RSpec.describe Connectors::Postgres, :integration do
     expect(columns).to eq([ :actor_id, :film_id, :_synced_at, :_sync_id ])
   end
 
+  def load(stream, rows)
+    Warehouse::Raw.create_loading_table(stream)
+    Warehouse::Raw.load_loading(stream, rows)
+    Warehouse::Raw.load(stream)
+  end
+
   it "#load" do
     stream = build_stream
 
     Warehouse::Raw.create_or_update_table(stream)
-    Warehouse::Raw.load(stream, [ { actor_id: 1, film_id: 10 }, { actor_id: 2, film_id: 20 } ])
+    load(stream, [ { actor_id: 1, film_id: 10 }, { actor_id: 2, film_id: 20 } ])
 
     expect(Warehouse::Base.db[Sequel[:raw][:pagila__film_actor]].count).to eq(2)
   end
@@ -49,11 +55,14 @@ RSpec.describe Connectors::Postgres, :integration do
     stream = build_stream
 
     Warehouse::Raw.create_or_update_table(stream)
-    Warehouse::Raw.load(stream, [ { actor_id: 1, film_id: 10 } ])
-    Warehouse::Raw.load(stream, [ { actor_id: 1, film_id: 10 }, { actor_id: 2, film_id: 20 } ])
+    load(stream, [ { actor_id: 1, film_id: 10 } ])
+    load(stream, [ { actor_id: 1, film_id: 10 }, { actor_id: 2, film_id: 20 } ])
 
     expect(Warehouse::Base.db[Sequel[:raw][:pagila__film_actor]].count).to eq(2)
   end
 
-  after { Warehouse::Base.db.drop_table?(Sequel[:raw][:pagila__film_actor]) }
+  after do
+    Warehouse::Base.db.drop_table?(Sequel[:raw][:pagila__film_actor])
+    Warehouse::Base.db.drop_table?(Sequel[:raw_loading][:pagila__film_actor])
+  end
 end
