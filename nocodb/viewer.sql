@@ -1,0 +1,4 @@
+CREATE ROLE makhazen_viewer LOGIN PASSWORD 'viewer';
+GRANT USAGE ON SCHEMA raw TO makhazen_viewer;
+GRANT SELECT ON ALL TABLES IN SCHEMA raw TO makhazen_viewer;
+ALTER DEFAULT PRIVILEGES FOR ROLE makhazen GRANT SELECT ON TABLES TO makhazen_viewer;

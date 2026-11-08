@@ -56,6 +56,7 @@ Then:
 
 - API: http://localhost:3000/up
 - Frontend: http://localhost:5173
+- NocoDB: http://localhost:8080
 
 `./start` follows the logs. Ctrl+C stops the logs, not the containers.
 Use `./stop` to stop everything.
@@ -95,6 +96,34 @@ Then start the stack with it:
 | Database | `pagila` | `pagila` |
 | User / password | `makhazen_reader` / `reader` | same |
 
+## Browse the warehouse with NocoDB
+
+[NocoDB](https://github.com/nocodb/nocodb) shows every warehouse table as a
+spreadsheet, with search, filters, sorting and a page per record. New tables
+show up on their own after each sync.
+
+Create a read-only user for it, once:
+
+```bash
+docker compose exec -T db psql -U makhazen -d makhazen_warehouse_development < nocodb/viewer.sql
+```
+
+The default privileges apply to tables `makhazen` creates from now on, and to
+tables a full refresh swaps in from `raw_loading`.
+
+Then open http://localhost:8080, create an account (it stays on your machine),
+and connect the warehouse: **Create Base → Connect External Data → PostgreSQL**.
+
+| Field | Value |
+|---|---|
+| Host / Port | `db` / `5432` |
+| Database | `makhazen_warehouse_development` |
+| Schema | `raw` |
+| User / password | `makhazen_viewer` / `viewer` |
+| Allow Data Edit | off |
+
+NocoDB keeps its own settings in `storage/nocodb`.
+
 ## Everyday commands
 
 | Command | What it does |
@@ -122,8 +151,9 @@ Then start the stack with it:
 makhazen/
 ├── backend/                    Rails API
 ├── frontend/                   React app
-├── storage/                    Local data, not in git (Postgres files, seeds)
-├── docker-compose.yml          Main stack: db, backend, frontend
+├── nocodb/                     Read-only warehouse user for NocoDB
+├── storage/                    Local data, not in git (Postgres files, seeds, NocoDB)
+├── docker-compose.yml          Main stack: db, backend, frontend, nocodb
 ├── docker-compose.pagila.yml   Optional sample source
 ├── start, stop                 Helper scripts
 ```

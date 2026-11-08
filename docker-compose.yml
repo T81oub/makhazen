@@ -54,5 +54,17 @@ services:
     depends_on:
       - backend
 
+  nocodb:
+    image: nocodb/nocodb:2026.10.0
+    environment:
+      NC_ALLOW_LOCAL_EXTERNAL_DBS: "true"
+    volumes:
+      - ./storage/nocodb:/usr/app/data
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
 volumes:
   bundle:
