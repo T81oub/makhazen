@@ -73,9 +73,8 @@ RSpec.describe Connectors::DataGouv do
 
   describe "#read" do
     def read_all(schema_name, name)
-      rows = []
-      connector.read(Stream.new(schema_name: schema_name, name: name)) { |batch| rows.concat(batch) }
-      rows
+      table = connector.discover.find { |t| t[:schema] == schema_name && t[:name] == name }
+      loaded_rows(table ? table[:columns] : [], schema_name: schema_name, name: name) { |stream, sync| connector.read(stream, sync) }
     end
 
     it "gives every row of the file as a Hash" do

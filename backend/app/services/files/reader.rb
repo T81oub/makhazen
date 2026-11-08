@@ -44,18 +44,23 @@ module Files
       end
     end
 
-    def each_batch(size:)
-      result = connection.query("SELECT #{select_list} FROM #{source}", path)
-      names = result.columns.map(&:name)
-
-      result.each_slice(size) do |rows|
-        yield rows.map { |row| names.zip(row).to_h }
-      end
+    def load_into(stream, sync)
+      attach_warehouse
+      connection.query(
+        "INSERT INTO wh.raw_loading.\"#{stream.destination_table}\" SELECT #{select_list}, ?::TIMESTAMPTZ, ?::BIGINT FROM #{source}",
+        sync.started_at.utc.iso8601(6), sync.id, path
+      ).rows_changed
     end
 
     private
 
     attr_reader :path, :read_function, :connection
+
+    def attach_warehouse
+      opts = Warehouse::Raw.db.opts
+      %w[INSTALL LOAD].each { |verb| connection.query("#{verb} postgres") }
+      connection.query("ATTACH 'host=#{opts[:host]} dbname=#{opts[:database]} user=#{opts[:user]} password=#{opts[:password]}' AS wh (TYPE postgres)")
+    end
 
     def source
       return "#{read_function}(?, all_varchar = true)" if %w[read_csv read_xlsx].include?(read_function)

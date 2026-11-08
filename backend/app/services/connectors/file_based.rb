@@ -4,8 +4,6 @@ module Connectors
   #   [{ id: "...", url: "..." }]
   # The id becomes the stream's schema, so it must stay the same between syncs.
   class FileBased < Base
-    BATCH_SIZE = 1000
-
     def discover
       locations.flat_map do |location|
         Dir.mktmpdir do |dir|
@@ -26,7 +24,7 @@ module Connectors
       end
     end
 
-    def read(stream)
+    def read(stream, sync)
       location = locations.find { |l| l[:id] == stream.schema_name }
       raise ConnectionError, "#{stream.schema_name} is gone from the source" unless location
 
@@ -37,8 +35,9 @@ module Connectors
         sha256 = Digest::SHA256.file(path).hexdigest
         return :unchanged if sha256 == stream.last_sha256
 
-        Files::Reader.new(path).each_batch(size: BATCH_SIZE) { |batch| yield batch }
+        count = Files::Reader.new(path).load_into(stream, sync)
         stream.last_sha256 = sha256
+        count
       end
     end
 

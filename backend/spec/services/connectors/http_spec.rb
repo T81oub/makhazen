@@ -54,13 +54,12 @@ RSpec.describe Connectors::Http do
     end
   end
 
-  describe "#read" do
-    def read_all(connector, schema_name, name)
-      rows = []
-      connector.read(Stream.new(schema_name: schema_name, name: name)) { |batch| rows.concat(batch) }
-      rows
-    end
+  def read_all(connector, schema_name, name)
+    table = connector.discover.find { |t| t[:schema] == schema_name && t[:name] == name }
+    loaded_rows(table ? table[:columns] : [], schema_name: schema_name, name: name) { |stream, sync| connector.read(stream, sync) }
+  end
 
+  describe "#read" do
     it "gives every row of the file as a Hash" do
       rows = read_all(connector, csv_url, "waste")
       expect(rows.size).to eq(3)
@@ -78,12 +77,7 @@ RSpec.describe Connectors::Http do
 
     it "skips a file that has not changed" do
       stream = Stream.new(schema_name: csv_url, name: "waste", last_sha256: Digest::SHA256.hexdigest(csv))
-      rows = []
-
-      result = connector.read(stream) { |batch| rows.concat(batch) }
-
-      expect(result).to eq(:unchanged)
-      expect(rows).to be_empty
+      expect(connector.read(stream, nil)).to eq(:unchanged)
     end
   end
 
@@ -91,8 +85,8 @@ RSpec.describe Connectors::Http do
     it "sends the credentials with every download" do
       stub = stub_request(:get, csv_url).with(headers: { "X-API-KEY" => "s3cret" }).to_return(body: csv)
 
-      connector(urls: [ csv_url ], auth: auth).read(Stream.new(schema_name: csv_url, name: "waste")) { }
-      expect(stub).to have_been_requested
+      read_all(connector(urls: [ csv_url ], auth: auth), csv_url, "waste")
+      expect(stub).to have_been_requested.twice
     end
   end
 end

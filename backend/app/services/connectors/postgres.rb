@@ -37,7 +37,7 @@ module Connectors
       end
     end
 
-    def read(stream)
+    def read(stream, _sync = nil)
       with_connection do |db|
         data = db[Sequel[stream.schema_name.to_sym][stream.name.to_sym]]
 

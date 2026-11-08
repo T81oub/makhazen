@@ -12,7 +12,7 @@ module Connectors
       raise NotImplementedError, "#{self.class.name} must implement #discover"
     end
 
-    def read(stream)
+    def read(stream, sync)
       raise NotImplementedError, "#{self.class.name} must implement #read"
     end
 

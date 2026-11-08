@@ -3,6 +3,10 @@ require "rails_helper"
 RSpec.describe Files::Reader do
   let(:reader) { described_class.new(file_fixture("waste_sample.csv").to_s) }
 
+  def rows_of(reader)
+    loaded_rows(reader.columns) { |stream, sync| reader.load_into(stream, sync) }
+  end
+
   describe "#columns" do
     it "detects every column of the CSV with its Postgres type" do
       expect(reader.columns.size).to eq(13)
@@ -11,21 +15,25 @@ RSpec.describe Files::Reader do
     end
   end
 
-  describe "#each_batch" do
-    it "gives every row as a Hash" do
-      rows = []
-      reader.each_batch(size: 1000) { |batch| rows.concat(batch) }
+  describe "#load_into" do
+    it "writes every row into the loading table" do
+      rows = rows_of(reader)
 
       expect(rows.size).to eq(3)
       expect(rows.first).to include("quali_waste" => "_Z", "time_period" => "2022")
+    end
+
+    it "stamps every row with the sync and returns how many it wrote" do
+      loaded_rows(reader.columns) do |stream, sync|
+        expect(reader.load_into(stream, sync)).to eq(3)
+        expect(Warehouse::Raw.db[Warehouse::Raw.loading_table(stream)].select_map(:_sync_id)).to eq([ 1, 1, 1 ])
+      end
     end
   end
 
   describe "with French accents" do
     def first_row(fixture)
-      rows = []
-      described_class.new(file_fixture(fixture).to_s).each_batch(size: 1000) { |batch| rows.concat(batch) }
-      rows.first
+      rows_of(described_class.new(file_fixture(fixture).to_s)).first
     end
 
     it "reads a UTF-8 file" do
@@ -50,11 +58,10 @@ RSpec.describe Files::Reader do
     after { file.unlink }
 
     it "reads every row instead of crashing past the rows DuckDB looked at" do
-      rows = []
-      described_class.new(file.path).each_batch(size: 10_000) { |batch| rows.concat(batch) }
+      rows = rows_of(described_class.new(file.path))
 
       expect(rows.size).to eq(30_001)
-      expect(rows.last).to eq("id" => "30000", "amount" => "N/A")
+      expect(rows).to include("id" => "30000", "amount" => "N/A")
     end
   end
 
@@ -70,9 +77,8 @@ RSpec.describe Files::Reader do
       expect(reader.columns.last).to eq({ name: "obs_value", type: "bigint", nullable: true })
     end
 
-    it "gives every row as a Hash" do
-      rows = []
-      reader.each_batch(size: 1000) { |batch| rows.concat(batch) }
+    it "writes every row with its type" do
+      rows = rows_of(reader)
       expect(rows.size).to eq(3)
       expect(rows.first).to include("quali_waste" => "_Z", "time_period" => 2022)
     end
@@ -99,11 +105,8 @@ RSpec.describe Files::Reader do
       expect(names).to all(satisfy { |name| name.length <= 63 })
     end
 
-    it "uses the same names in the rows" do
-      rows = []
-      reader.each_batch(size: 10) { |batch| rows.concat(batch) }
-
-      expect(rows.first.keys).to eq(reader.columns.map { |c| c[:name] })
+    it "writes the values under those names" do
+      expect(rows_of(reader).first).to include("montant" => "1", "montant_2" => "2", "col_2022" => "3")
     end
   end
 
@@ -120,11 +123,8 @@ RSpec.describe Files::Reader do
     after { FileUtils.rm_rf(File.dirname(path)) }
 
     it "reads the first sheet, with clean names, as text" do
-      rows = []
-      reader.each_batch(size: 10) { |batch| rows.concat(batch) }
-
       expect(reader.columns.map { |c| c[:type] }).to all(eq("text"))
-      expect(rows).to eq([ { "ville" => "Paris", "tonnes" => "42" } ])
+      expect(rows_of(reader)).to eq([ { "ville" => "Paris", "tonnes" => "42" } ])
     end
   end
 
@@ -150,13 +150,11 @@ RSpec.describe Files::Reader do
       expect(types).to include("address" => "jsonb", "tags" => "jsonb")
     end
 
-    it "gives objects and arrays back as JSON text that Postgres can store" do
-      rows = []
-      reader.each_batch(size: 1000) { |batch| rows.concat(batch) }
+    it "stores objects and arrays as jsonb in Postgres" do
+      row = rows_of(reader).first
 
-      expect(rows.first["address"]).to be_a(String)
-      expect(JSON.parse(rows.first["address"])).to eq("city" => "Paris", "zip" => "75001")
-      expect(JSON.parse(rows.first["tags"])).to eq([ "a", "b" ])
+      expect(JSON.parse(row["address"])).to eq("city" => "Paris", "zip" => "75001")
+      expect(JSON.parse(row["tags"])).to eq([ "a", "b" ])
     end
   end
 end
