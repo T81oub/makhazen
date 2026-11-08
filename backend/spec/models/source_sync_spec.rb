@@ -35,7 +35,7 @@ RSpec.describe Source, "#sync!", :integration do
     allow(connector).to receive(:discover) do
       source.streams.map { |s| { schema: s.schema_name, name: s.name, columns: s.source_columns, primary_key: s.source_primary_key } }
     end
-    allow(connector).to receive(:read).and_yield([ { id: 1 }, { id: 2 } ])
+    fake_read(connector, [ { id: 1 }, { id: 2 } ])
   end
 
   after do
@@ -55,10 +55,10 @@ RSpec.describe Source, "#sync!", :integration do
   end
 
   it "keeps going when one stream fails" do
-    allow(connector).to receive(:read) do |stream, &block|
+    allow(connector).to receive(:read) do |stream, sync|
       raise Connectors::ConnectionError, "connection lost" if stream.name == "actor"
 
-      block.call([ { id: 1 } ])
+      fake_load(stream, sync, [ { id: 1 } ])
     end
 
     syncs = source.sync!

@@ -37,7 +37,7 @@ module Connectors
       end
     end
 
-    def read(stream, _sync = nil)
+    def read(stream, sync)
       with_connection do |db|
         data = db[Sequel[stream.schema_name.to_sym][stream.name.to_sym]]
 
@@ -45,9 +45,13 @@ module Connectors
           data = data.where(Sequel[stream.updated_at_attr.to_sym] > stream.last_sync)
         end
 
-        data.paged_each(rows_per_fetch: 1000).each_slice(1000) do |batch|
-          yield batch
-        end
+        data = data.select(*stream.source_columns.map { |c| c["name"].to_sym })
+                   .select_append(Sequel.cast(sync.started_at.utc.iso8601(6), :timestamptz).as(:_synced_at), Sequel.cast(sync.id, :bigint).as(:_sync_id))
+        loading = Warehouse::Raw.loading_table(stream)
+        columns = Warehouse::Raw.columns(stream).map { |c| c["name"].to_sym }
+
+        Warehouse::Raw.db.copy_into(loading, columns: columns, data: db.enum_for(:copy_table, data))
+        Warehouse::Raw.db[loading].count
       end
     end
 

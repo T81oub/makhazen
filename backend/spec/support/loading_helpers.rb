@@ -7,6 +7,15 @@ module LoadingHelpers
   ensure
     Warehouse::Raw.drop_loading_table(stream)
   end
+
+  def fake_load(stream, sync, rows)
+    Warehouse::Raw.db[Warehouse::Raw.loading_table(stream)].multi_insert(rows.map { |row| row.merge(_synced_at: sync.started_at, _sync_id: sync.id) })
+    rows.size
+  end
+
+  def fake_read(connector, rows)
+    allow(connector).to receive(:read) { |stream, sync| fake_load(stream, sync, rows) }
+  end
 end
 
 RSpec.configure { |config| config.include LoadingHelpers }

@@ -38,7 +38,7 @@ RSpec.describe Connectors::Postgres, :integration do
 
   def load(stream, rows)
     Warehouse::Raw.create_loading_table(stream)
-    Warehouse::Raw.load_loading(stream, rows)
+    Warehouse::Raw.db[Warehouse::Raw.loading_table(stream)].multi_insert(rows)
     Warehouse::Raw.load(stream)
   end
 

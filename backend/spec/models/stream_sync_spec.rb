@@ -34,9 +34,7 @@ RSpec.describe Stream, "#sync!", :integration do
     allow(connector).to receive(:discover) do
       [ { schema: stream.schema_name, name: stream.name, columns: stream.source_columns, primary_key: stream.source_primary_key } ]
     end
-    allow(connector).to receive(:read)
-      .and_yield([ { actor_id: 1, first_name: "PENELOPE" }, { actor_id: 2, first_name: "NICK" } ])
-      .and_yield([ { actor_id: 3, first_name: "ED" } ])
+    fake_read(connector, [ { actor_id: 1, first_name: "PENELOPE" }, { actor_id: 2, first_name: "NICK" }, { actor_id: 3, first_name: "ED" } ])
   end
 
   after { Warehouse::Base.db.drop_table?(Sequel[:raw][:pagila__actor]) }
@@ -84,8 +82,8 @@ RSpec.describe Stream, "#sync!", :integration do
 
   it "never leaves a half-loaded table" do
     stream.sync!
-    allow(connector).to receive(:read) do |_stream, &block|
-      block.call([ { actor_id: 9, first_name: "NEW" } ])
+    allow(connector).to receive(:read) do |s, sync|
+      fake_load(s, sync, [ { actor_id: 9, first_name: "NEW" } ])
       raise Connectors::ConnectionError, "connection lost"
     end
 
@@ -112,7 +110,7 @@ RSpec.describe Stream, "#sync!", :integration do
     end
 
     before do
-      allow(connector).to receive(:read).and_yield([
+      fake_read(connector, [
         { actor_id: 1, first_name: "PENELOPE", last_update: monday },
         { actor_id: 2, first_name: "NICK", last_update: monday }
       ])
@@ -125,7 +123,7 @@ RSpec.describe Stream, "#sync!", :integration do
 
     it "updates changed rows and adds new ones, without duplicates" do
       stream.sync!
-      allow(connector).to receive(:read).and_yield([
+      fake_read(connector, [
         { actor_id: 1, first_name: "PENNY", last_update: tuesday },
         { actor_id: 3, first_name: "ED", last_update: tuesday }
       ])
@@ -137,7 +135,7 @@ RSpec.describe Stream, "#sync!", :integration do
 
     it "stamps an updated row with the sync that changed it" do
       first = stream.sync!
-      allow(connector).to receive(:read).and_yield([ { actor_id: 1, first_name: "PENNY", last_update: tuesday } ])
+      fake_read(connector, [ { actor_id: 1, first_name: "PENNY", last_update: tuesday } ])
       second = stream.sync!
 
       expect(raw_table.order(:actor_id).select_map(:_sync_id)).to eq([ second.id, first.id ])
@@ -145,7 +143,7 @@ RSpec.describe Stream, "#sync!", :integration do
 
     it "keeps every row and last_sync when nothing changed" do
       stream.sync!
-      allow(connector).to receive(:read)
+      allow(connector).to receive(:read).and_return(0)
       sync = stream.sync!
 
       expect(sync.rows_loaded).to eq(0)
@@ -166,7 +164,7 @@ RSpec.describe Stream, "#sync!", :integration do
       stream.update!(updated_at_attr: nil)
       stream.sync!
       stream.update!(updated_at_attr: "last_update")
-      allow(connector).to receive(:read).and_yield([ { actor_id: 1, first_name: "PENNY", last_update: tuesday } ])
+      fake_read(connector, [ { actor_id: 1, first_name: "PENNY", last_update: tuesday } ])
       stream.sync!
 
       expect(raw_table.order(:actor_id).select_map(:first_name)).to eq(%w[PENNY NICK])
@@ -186,9 +184,9 @@ RSpec.describe Stream, "#sync!", :integration do
   end
 
   it "saves the sha256 the connector found" do
-    allow(connector).to receive(:read) do |s, &block|
-      block.call([ { actor_id: 1, first_name: "PENELOPE" } ])
+    allow(connector).to receive(:read) do |s, sync|
       s.last_sha256 = "abc123"
+      fake_load(s, sync, [ { actor_id: 1, first_name: "PENELOPE" } ])
     end
     stream.sync!
 
@@ -215,7 +213,7 @@ RSpec.describe Stream, "#sync!", :integration do
     end
 
     before do
-      allow(connector).to receive(:read).and_yield([
+      fake_read(connector, [
         { actor_id: 1, first_name: "ALEX", last_update: monday },
         { actor_id: 2, first_name: "JOHN", last_update: monday }
       ])
@@ -227,7 +225,7 @@ RSpec.describe Stream, "#sync!", :integration do
       allow(connector).to receive(:discover).and_return([
         { schema: "public", name: "actor", columns: stream.source_columns + [ role ], primary_key: [ "actor_id" ] }
       ])
-      allow(connector).to receive(:read).and_yield([
+      fake_read(connector, [
         { actor_id: 3, first_name: "PENELOPE", last_update: tuesday, role: "teacher" }
       ])
       stream.sync!

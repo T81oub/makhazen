@@ -33,8 +33,6 @@ class Stream < ApplicationRecord
     begin
       syncs.running.update_all(status: "failed", error: "Interrupted: the process stopped before the sync could finish", finished_at: Time.current)
       sync = syncs.create!(started_at: Time.current)
-      count = 0
-      metadata = { _synced_at: sync.started_at, _sync_id: sync.id }
 
       table = source.connector_instance.discover.find { |t| t[:schema] == schema_name && t[:name] == name }
 
@@ -48,11 +46,7 @@ class Stream < ApplicationRecord
       Warehouse::Raw.create_or_update_table(self) if updated_at_attr.present?
       Warehouse::Raw.create_loading_table(self)
 
-      result = source.connector_instance.read(self, sync) do |batch|
-        Warehouse::Raw.load_loading(self, batch.map { |row| row.merge(metadata) })
-        count += batch.size
-      end
-      count = result if result.is_a?(Integer)
+      result = source.connector_instance.read(self, sync)
 
       if result == :unchanged
         Warehouse::Raw.drop_loading_table(self)
@@ -66,7 +60,7 @@ class Stream < ApplicationRecord
         save!
       end
 
-      sync.update!(status: "succeeded", rows_loaded: count, finished_at: Time.current)
+      sync.update!(status: "succeeded", rows_loaded: result == :unchanged ? 0 : result, finished_at: Time.current)
       sync
     rescue => e
       Warehouse::Raw.drop_loading_table(self)

@@ -66,10 +66,6 @@ module Warehouse
       end
     end
 
-    def self.load_loading(stream, rows)
-      db[loading_table(stream)].multi_insert(rows)
-    end
-
     def self.swap(stream)
       db.transaction do
         db.drop_table?(table(stream))

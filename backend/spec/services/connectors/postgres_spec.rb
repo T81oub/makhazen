@@ -124,44 +124,37 @@ RSpec.describe Connectors::Postgres, :integration do
     end
   end
     describe "#read" do
-    def read_all(table)
-      stream = Stream.new(schema_name: "public", name: table)
-      batches = []
-      connector.read(stream) { |batch| batches << batch }
-      batches
+    def read_all(table, **attributes)
+      columns = connector.discover.find { |t| t[:schema] == "public" && t[:name] == table }[:columns]
+      loaded_rows(columns, schema_name: "public", name: table) do |stream, sync|
+        stream.assign_attributes(attributes)
+        @count = connector.read(stream, sync)
+      end
     end
 
-    it "reads every row of the table" do
-      expect(read_all("actor").flatten.size).to eq(200)
+    it "copies every row of the table" do
+      expect(read_all("actor").size).to eq(200)
     end
 
-    it "reads a big table in batches of at most 1000 rows" do
-      batches = read_all("rental")
-      expect(batches.size).to eq(17)
-      expect(batches.map(&:size).max).to eq(1000)
+    it "returns how many rows it copied" do
+      read_all("actor")
+      expect(@count).to eq(200)
     end
 
-    it "gives each row as a Hash" do
-      penelope = read_all("actor").flatten.find { |row| row[:actor_id] == 1 }
-      expect(penelope).to include(first_name: "PENELOPE", last_name: "GUINESS")
+    it "copies the values of each row" do
+      penelope = read_all("actor").find { |row| row["actor_id"] == 1 }
+      expect(penelope).to include("first_name" => "PENELOPE", "last_name" => "GUINESS")
     end
 
-    it "reads only the rows newer than last_sync" do
-      stream = Stream.new(schema_name: "public", name: "payment",
-                          updated_at_attr: "payment_date", last_sync: "2022-07-01T00:00:00Z")
-      rows = []
-      connector.read(stream) { |batch| rows.concat(batch) }
+    it "copies only the rows newer than last_sync" do
+      rows = read_all("payment", updated_at_attr: "payment_date", last_sync: "2022-07-01T00:00:00Z")
 
       expect(rows.size).to eq(2334)
-      expect(rows.map { |row| row[:payment_date] }).to all(be > Time.utc(2022, 7, 1))
+      expect(rows.map { |row| row["payment_date"] }).to all(be > Time.utc(2022, 7, 1))
     end
 
-    it "reads every row when there is no last_sync yet" do
-      stream = Stream.new(schema_name: "public", name: "payment", updated_at_attr: "payment_date")
-      rows = []
-      connector.read(stream) { |batch| rows.concat(batch) }
-
-      expect(rows.size).to eq(16049)
+    it "copies every row when there is no last_sync yet" do
+      expect(read_all("payment", updated_at_attr: "payment_date").size).to eq(16049)
     end
   end
 end
