@@ -44,6 +44,44 @@ Postgres warehouse, on a schedule.
    - an incremental sync upserts only the rows that changed.
 4. Every sync is recorded with its status, row count and error, if any.
 
+### One sync, step by step
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Job as SyncStreamJob
+    participant Stream
+    participant Connector
+    participant Source as Source system
+    participant WH as Warehouse
+
+    Job->>Stream: sync!
+    Stream->>Stream: take the advisory lock, close syncs left running, create a Sync
+    Stream->>Connector: discover
+    Connector->>Source: read tables, columns and primary keys
+    Connector-->>Stream: columns
+    Stream->>WH: create raw_loading (incremental: also add new columns to raw)
+    Stream->>Connector: read(stream, sync)
+    alt Postgres
+        Connector->>Source: COPY (SELECT ... newer than last_sync)
+        Connector->>WH: COPY into raw_loading
+    else File
+        Connector->>Source: download, unzip
+        Connector->>WH: DuckDB INSERT into raw_loading
+    end
+    Connector-->>Stream: rows loaded
+    alt Full refresh
+        Stream->>WH: replace raw with raw_loading
+    else Incremental
+        Stream->>WH: upsert raw from raw_loading, save last_sync
+    end
+    Stream->>Stream: mark the Sync succeeded, release the lock
+    Stream-->>Job: sync
+```
+
+If any step fails, `raw_loading` is dropped, the Sync is marked failed with its
+error, and `raw` keeps its previous copy.
+
 Connector settings, sync modes and console examples are in the [backend README](backend/README.md).
 
 ## Getting started
@@ -105,6 +143,8 @@ pagila.streams.find_by(name: "rental").sync!.rows_loaded
 ## Browsing the warehouse
 
 NocoDB shows every warehouse table as a spreadsheet, and new tables appear after each sync.
+
+![A data.gouv file synced by makhazen, browsed in NocoDB](docs/images/nocodb.png)
 
 1. Create a read-only user, once:
 
