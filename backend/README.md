@@ -18,7 +18,7 @@
 | `data_gouv` | `dataset` (slug or id)                              | data file in the dataset |
 | `http`      | `urls`, optional `auth`                             | data file at each URL |
 
-Files can be CSV, Parquet or JSON, plain, zipped or gzipped. The format is found from the file itself, not from its name.
+Files can be CSV, Parquet, JSON or Excel, plain, zipped or gzipped. The format is found from the file itself, not from its name.
 
 `auth` for `http` is one of:
 
